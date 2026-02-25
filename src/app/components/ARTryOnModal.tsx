@@ -70,6 +70,28 @@ const loadScriptWithFallback = async (urls: string[]) => {
   throw lastError;
 };
 
+const loadGltfLoaderClass = async () => {
+  const moduleUrls = [
+    "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
+    "https://unpkg.com/three@0.153.0/examples/jsm/loaders/GLTFLoader.js?module",
+    "https://esm.sh/three@0.153.0/examples/jsm/loaders/GLTFLoader",
+  ];
+
+  let lastError: unknown;
+  for (const url of moduleUrls) {
+    try {
+      const gltfModule = await withTimeout(import(/* @vite-ignore */ url), 9000, `GLTF_MODULE_TIMEOUT:${url}`);
+      if (gltfModule?.GLTFLoader) {
+        return gltfModule.GLTFLoader;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+};
+
 export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl }: ARTryOnModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const sceneHostRef = useRef<HTMLDivElement>(null);
@@ -224,17 +246,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           "https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js",
           "https://unpkg.com/three@0.153.0/build/three.min.js",
         ]);
-        let gltfLoaderAvailable = false;
+        let GLTFLoaderClass: any = null;
         try {
-          await loadScriptWithFallback([
-            "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
-            "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
-            "https://threejs.org/examples/js/loaders/GLTFLoader.js",
-            "https://cdnjs.cloudflare.com/ajax/libs/three.js/r153/examples/js/loaders/GLTFLoader.js",
-          ]);
-          gltfLoaderAvailable = true;
+          GLTFLoaderClass = await loadGltfLoaderClass();
         } catch {
-          gltfLoaderAvailable = false;
+          GLTFLoaderClass = null;
         }
         const faceMeshScriptUrl = await loadScriptWithFallback([
           "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
@@ -335,32 +351,51 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
             throw new Error("missing modelUrl");
           }
 
-          if (!gltfLoaderAvailable || !THREE.GLTFLoader) {
+          if (!GLTFLoaderClass) {
             throw new Error("GLTF_LOADER_UNAVAILABLE");
           }
 
-          const loader = new THREE.GLTFLoader();
-          const gltf = await withTimeout(
-            new Promise<any>((resolve, reject) => {
-              loader.load(modelUrl, resolve, undefined, reject);
-            }),
-            9000,
-            "MODEL_LOAD_TIMEOUT",
-          );
+          const modelCandidates = modelUrl
+            .split("|")
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+          let gltf: any = null;
+          let modelLoadError: unknown = null;
+          for (const candidateUrl of modelCandidates) {
+            try {
+              const loader = new GLTFLoaderClass();
+              gltf = await withTimeout(
+                new Promise<any>((resolve, reject) => {
+                  loader.load(candidateUrl, resolve, undefined, reject);
+                }),
+                9000,
+                `MODEL_LOAD_TIMEOUT:${candidateUrl}`,
+              );
+              break;
+            } catch (error) {
+              modelLoadError = error;
+            }
+          }
+
+          if (!gltf) {
+            throw modelLoadError || new Error("MODEL_LOAD_FAILED");
+          }
+
           glasses = gltf.scene;
           normalizeModel(glasses);
         } catch {
           glasses = createProductModel();
           usedFallback = true;
-          if (!gltfLoaderAvailable) {
+          if (!GLTFLoaderClass) {
             setStatusMessage("GLTFLoader недоступен по CDN, используем локальную 3D-модель товара. Ожидаем распознавание лица...");
           } else {
             setStatusMessage(`Удалённая модель ${modelName || "товара"} недоступна, используем локальную 3D-модель. Ожидаем распознавание лица...`);
           }
         }
 
-        glasses.scale.setScalar(1.2);
-        glasses.position.set(0, 0.02, 0.02);
+        glasses.scale.setScalar(1.05);
+        glasses.position.set(0, -0.08, 0.04);
 
         const faceAnchor = new THREE.Group();
         faceAnchor.position.set(0, 0, -2.4);
@@ -436,10 +471,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const smoothFactor = 0.3;
-        const anchorTargetX = ((centerX - 0.5) * 5.2 + (noseBridge.x - centerX) * 2.4);
-        const anchorTargetY = (-(centerY - 0.5) * 3.2 + (0.5 - noseBridge.y) * 1.2 - 0.02);
-        const anchorTargetZ = (-noseBridge.z * 8.5 - 2.15);
+        const mirroredCenterX = 1 - centerX;
+        const smoothFactor = 0.22;
+        const anchorTargetX = ((mirroredCenterX - 0.5) * 4.7);
+        const anchorTargetY = (-(centerY - 0.5) * 3.05 - 0.24);
+        const anchorTargetZ = (-noseBridge.z * 7.1 - 2.25);
 
         if (faceAnchorRef.current) {
           faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * smoothFactor;
@@ -448,14 +484,14 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         }
 
         const faceWidth = Math.sqrt((rightTemple.x - leftTemple.x) ** 2 + (rightTemple.y - leftTemple.y) ** 2);
-        const targetScale = Math.max(eyeDistance * 7.2, faceWidth * 4.4);
+        const targetScale = Math.max(eyeDistance * 6.5, faceWidth * 3.9);
         modelRef.current.scale.x += (targetScale - modelRef.current.scale.x) * smoothFactor;
         modelRef.current.scale.y += (targetScale - modelRef.current.scale.y) * smoothFactor;
         modelRef.current.scale.z = modelRef.current.scale.x;
 
         const targetRoll = -Math.atan2(dy, dx);
-        const targetYaw = (leftTemple.z - rightTemple.z) * 5;
-        const targetPitch = (chin.y - forehead.y - 0.33) * 4;
+        const targetYaw = (leftTemple.z - rightTemple.z) * 2.6;
+        const targetPitch = (chin.y - forehead.y - 0.33) * 2.2;
 
         const rotationTarget = faceAnchorRef.current || modelRef.current;
         rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * smoothFactor;
@@ -478,7 +514,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         faceCamera.start();
 
         if (usedFallback) {
-          if (!gltfLoaderAvailable) {
+          if (!GLTFLoaderClass) {
             setStatusMessage("GLTFLoader недоступен по CDN, используем локальную 3D-модель товара. Ожидаем распознавание лица...");
           } else {
             setStatusMessage(`Удалённая модель ${modelName || "товара"} недоступна, используем локальную 3D-модель. Ожидаем распознавание лица...`);
@@ -507,8 +543,19 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         </DialogHeader>
 
         <div className="relative rounded-lg overflow-hidden bg-black" style={{ minHeight: "500px" }}>
-          <video ref={videoRef} className={`absolute inset-0 h-full w-full object-cover ${cameraEnabled ? "block" : "hidden"}`} autoPlay playsInline muted />
-          <div ref={sceneHostRef} className={`absolute inset-0 ${cameraEnabled ? "block" : "hidden"}`} />
+          <video
+            ref={videoRef}
+            className={`absolute inset-0 h-full w-full object-cover ${cameraEnabled ? "block" : "hidden"}`}
+            style={{ transform: "scaleX(-1)" }}
+            autoPlay
+            playsInline
+            muted
+          />
+          <div
+            ref={sceneHostRef}
+            className={`absolute inset-0 ${cameraEnabled ? "block" : "hidden"}`}
+            style={{ transform: "scaleX(-1)" }}
+          />
 
           {!cameraEnabled && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-200 bg-slate-900/90 px-6">
