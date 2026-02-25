@@ -74,8 +74,6 @@ const loadGltfLoaderClass = async () => {
   await loadScriptWithFallback([
     "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
     "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
-    "https://threejs.org/examples/js/loaders/GLTFLoader.js",
-    "https://cdnjs.cloudflare.com/ajax/libs/three.js/r153/examples/js/loaders/GLTFLoader.js",
     "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r153/examples/js/loaders/GLTFLoader.js",
   ]);
 
@@ -518,7 +516,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         }
       } catch (arError) {
         const reason = arError instanceof Error ? arError.message : "неизвестная ошибка";
-        setStatusMessage(`Камера включена, но AR-трекинг не инициализировался (${reason}). Нажмите «Включить камеру» ещё раз.`);
+        if (reason.includes("onBuild")) {
+          setStatusMessage("AR не инициализирован: конфликт версий GLTFLoader/Three.js. Обновите страницу (Ctrl+F5) и попробуйте снова.");
+        } else {
+          setStatusMessage(`Камера включена, но AR-трекинг не инициализировался (${reason}). Нажмите «Включить камеру» ещё раз.`);
+        }
       }
     } catch (error) {
       cleanup();
