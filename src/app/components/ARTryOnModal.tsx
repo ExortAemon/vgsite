@@ -489,7 +489,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         if (reason.includes("onBuild")) {
           setStatusMessage("AR не инициализирован: конфликт версий GLTFLoader/Three.js. Обновите страницу (Ctrl+F5) и попробуйте снова.");
         } else if (reason.includes("GLTF_LOADER_UNAVAILABLE") || reason.includes("GLTF_LOADER_INCOMPATIBLE") || reason.includes("GLTF_MODULE_TIMEOUT")) {
-          setStatusMessage("Не удалось загрузить GLTFLoader. Выполните `npm install` и `npm run prepare:vendor`, затем перезапустите dev-сервер.");
+          setStatusMessage("Не удалось загрузить GLTFLoader. Запустите npm install, затем npm run dev (vendor копируется автоматически). Проверьте: /vendor/three.min.js и /vendor/GLTFLoader.js.");
         } else if (reason.includes("MODEL_LOAD_FAILED:")) {
           setStatusMessage(`Не удалось загрузить вашу 3D-модель (${reason.replace("MODEL_LOAD_FAILED:", "")}). Проверьте, что файл .glb корректный и доступен по URL.`);
         } else {

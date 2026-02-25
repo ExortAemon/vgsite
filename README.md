@@ -10,6 +10,7 @@ https://www.figma.com/design/DdDCtqW30NBfNZ6Vzi1eG0/vg
    ```bash
    npm install
    ```
+   > После установки автоматически выполняется `prepare:vendor` и копирует локальные файлы three/GLTFLoader в `public/vendor`.
 3. Запустите dev-сервер:
    ```bash
    npm run dev
@@ -68,7 +69,7 @@ https://www.figma.com/design/DdDCtqW30NBfNZ6Vzi1eG0/vg
    ```bash
    npm install
    ```
-2. Автоматически скопируйте vendor-файлы из `node_modules/three`:
+2. Скопируйте vendor-файлы из `node_modules/three` вручную (если нужно повторить):
    ```bash
    npm run prepare:vendor
    ```

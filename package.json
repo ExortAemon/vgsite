@@ -4,8 +4,8 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite",
+    "build": "npm run prepare:vendor && vite build",
+    "dev": "npm run prepare:vendor && vite",
     "prepare:vendor": "node scripts/copy-vendor.mjs",
     "postinstall": "npm run prepare:vendor"
   },
