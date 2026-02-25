@@ -81,6 +81,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   const animationFrameRef = useRef<number | null>(null);
   const faceDetectedRef = useRef(false);
   const noFaceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const trackingConfirmedRef = useRef(false);
 
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [initializing, setInitializing] = useState(false);
@@ -134,6 +135,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
     modelRef.current = null;
     faceDetectedRef.current = false;
+    trackingConfirmedRef.current = false;
     setCameraEnabled(false);
     setInitializing(false);
   }, []);
@@ -259,24 +261,51 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         keyLight.position.set(0, 1, 2);
         scene.add(keyLight);
 
-        const createFallbackGlasses = () => {
+        const createProductModel = () => {
+          const presetKey = (modelName || productName || "default").toLowerCase();
+          const isRound = presetKey.includes("round");
+          const isSport = presetKey.includes("sport");
+          const isVintage = presetKey.includes("vintage") || presetKey.includes("square");
+          const isCatEye = presetKey.includes("cat") || presetKey.includes("designer");
+          const isAviator = presetKey.includes("aviator");
+
           const group = new THREE.Group();
-          const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, metalness: 0.4, roughness: 0.35 });
-          const bridgeMaterial = new THREE.MeshStandardMaterial({ color: 0x22d3ee, metalness: 0.5, roughness: 0.3 });
+          const baseColor = isSport ? 0xf97316 : isVintage ? 0x0f172a : isCatEye ? 0xdc2626 : isAviator ? 0xf59e0b : 0x0ea5e9;
+          const accentColor = isSport ? 0xfb7185 : isVintage ? 0x64748b : isCatEye ? 0xfda4af : isAviator ? 0xfcd34d : 0x22d3ee;
+          const frameMaterial = new THREE.MeshStandardMaterial({ color: baseColor, metalness: 0.5, roughness: 0.35 });
+          const bridgeMaterial = new THREE.MeshStandardMaterial({ color: accentColor, metalness: 0.55, roughness: 0.3 });
 
-          const leftLens = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.05, 16, 40), frameMaterial);
-        leftLens.position.set(-0.45, 0, 0);
-        const rightLens = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.05, 16, 40), frameMaterial);
-        rightLens.position.set(0.45, 0, 0);
-        const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.06, 0.05), bridgeMaterial);
-        bridge.position.set(0, 0, 0);
-        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.04), frameMaterial);
-        leftArm.position.set(-0.9, 0.08, -0.05);
-        leftArm.rotation.y = 0.45;
-        const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.04), frameMaterial);
-        rightArm.position.set(0.9, 0.08, -0.05);
-        rightArm.rotation.y = -0.45;
+          const lensGeometry = isRound
+            ? new THREE.TorusGeometry(0.3, 0.045, 16, 40)
+            : isSport
+              ? new THREE.TorusGeometry(0.37, 0.042, 12, 36)
+              : isCatEye
+                ? new THREE.TorusGeometry(0.33, 0.045, 16, 36)
+                : isVintage
+                  ? new THREE.TorusGeometry(0.31, 0.05, 14, 32)
+                  : new THREE.TorusGeometry(0.35, 0.05, 16, 40);
 
+          const leftLens = new THREE.Mesh(lensGeometry, frameMaterial);
+          leftLens.position.set(-0.45, isCatEye ? 0.03 : 0, 0);
+          if (isCatEye) leftLens.rotation.z = 0.16;
+          const rightLens = new THREE.Mesh(lensGeometry, frameMaterial);
+          rightLens.position.set(0.45, isCatEye ? 0.03 : 0, 0);
+          if (isCatEye) rightLens.rotation.z = -0.16;
+
+          const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.05), bridgeMaterial);
+          bridge.position.set(0, isAviator ? -0.02 : 0, 0);
+
+          const leftArm = new THREE.Mesh(new THREE.BoxGeometry(isSport ? 0.65 : 0.55, 0.04, 0.04), frameMaterial);
+          leftArm.position.set(-0.92, 0.08, -0.05);
+          leftArm.rotation.y = 0.45;
+          const rightArm = new THREE.Mesh(new THREE.BoxGeometry(isSport ? 0.65 : 0.55, 0.04, 0.04), frameMaterial);
+          rightArm.position.set(0.92, 0.08, -0.05);
+          rightArm.rotation.y = -0.45;
+
+          const topBar = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.035, 0.04), bridgeMaterial);
+          topBar.position.set(0, isAviator ? 0.28 : 0.24, 0);
+
+          group.add(topBar);
           group.add(leftLens, rightLens, bridge, leftArm, rightArm);
           return group;
         };
@@ -317,12 +346,12 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           glasses = gltf.scene;
           normalizeModel(glasses);
         } catch {
-          glasses = createFallbackGlasses();
+          glasses = createProductModel();
           usedFallback = true;
           if (!gltfLoaderAvailable) {
-            setStatusMessage("GLTFLoader недоступен по CDN, используем встроенную 3D-оправу. Трекинг лица активен.");
+            setStatusMessage("GLTFLoader недоступен по CDN, используем локальную 3D-модель товара. Ожидаем распознавание лица...");
           } else {
-            setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу.`);
+            setStatusMessage(`Удалённая модель ${modelName || "товара"} недоступна, используем локальную 3D-модель. Ожидаем распознавание лица...`);
           }
         }
 
@@ -333,7 +362,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         faceDetectedRef.current = false;
 
         noFaceTimerRef.current = setTimeout(() => {
-          if (!faceDetectedRef.current) {
+          if (!faceDetectedRef.current && !trackingConfirmedRef.current) {
             setStatusMessage("Камера включена, но лицо не найдено. Держите лицо в центре кадра и при хорошем свете.");
           }
         }, 4500);
@@ -356,8 +385,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         faceMesh.setOptions({
           maxNumFaces: 1,
           refineLandmarks: true,
-          minDetectionConfidence: 0.6,
-          minTrackingConfidence: 0.6,
+          minDetectionConfidence: 0.45,
+          minTrackingConfidence: 0.45,
         });
 
         faceMesh.onResults((results: any) => {
@@ -367,9 +396,27 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
           faceDetectedRef.current = true;
 
+          if (!trackingConfirmedRef.current) {
+            trackingConfirmedRef.current = true;
+            if (noFaceTimerRef.current) {
+              clearTimeout(noFaceTimerRef.current);
+              noFaceTimerRef.current = null;
+            }
+            if (usedFallback) {
+              setStatusMessage(`Трекинг лица активен (${modelName || "локальная 3D-модель"}). Двигайте головой для проверки.`);
+            } else {
+              setStatusMessage(`Трекинг лица активен: ${modelName}`);
+            }
+          }
+
         const landmarks = results.multiFaceLandmarks[0];
         const leftEye = landmarks[33];
         const rightEye = landmarks[263];
+        const leftTemple = landmarks[234];
+        const rightTemple = landmarks[454];
+        const forehead = landmarks[10];
+        const chin = landmarks[152];
+        const nose = landmarks[1];
 
         const centerX = (leftEye.x + rightEye.x) / 2;
         const centerY = (leftEye.y + rightEye.y) / 2;
@@ -378,17 +425,23 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const smoothFactor = 0.6;
-        modelRef.current.position.x += ((centerX - 0.5) * 6 - modelRef.current.position.x) * smoothFactor;
-        modelRef.current.position.y += (-(centerY - 0.5) * 4 - modelRef.current.position.y) * smoothFactor;
+        const smoothFactor = 0.35;
+        modelRef.current.position.x += ((centerX - 0.5) * 5.6 - modelRef.current.position.x) * smoothFactor;
+        modelRef.current.position.y += ((-(centerY - 0.5) * 3.6 + 0.1) - modelRef.current.position.y) * smoothFactor;
+        modelRef.current.position.z += ((-nose.z * 10 - 2.6) - modelRef.current.position.z) * smoothFactor;
 
-        const targetScale = eyeDistance * 8;
+        const faceWidth = Math.sqrt((rightTemple.x - leftTemple.x) ** 2 + (rightTemple.y - leftTemple.y) ** 2);
+        const targetScale = Math.max(eyeDistance * 7.8, faceWidth * 4.8);
         modelRef.current.scale.x += (targetScale - modelRef.current.scale.x) * smoothFactor;
         modelRef.current.scale.y += (targetScale - modelRef.current.scale.y) * smoothFactor;
         modelRef.current.scale.z = modelRef.current.scale.x;
 
-        const targetRotation = -Math.atan2(dy, dx);
-        modelRef.current.rotation.z += (targetRotation - modelRef.current.rotation.z) * smoothFactor;
+        const targetRoll = -Math.atan2(dy, dx);
+        const targetYaw = (leftTemple.z - rightTemple.z) * 5;
+        const targetPitch = (chin.y - forehead.y - 0.33) * 4;
+        modelRef.current.rotation.z += (targetRoll - modelRef.current.rotation.z) * smoothFactor;
+        modelRef.current.rotation.y += (targetYaw - modelRef.current.rotation.y) * smoothFactor;
+        modelRef.current.rotation.x += (targetPitch - modelRef.current.rotation.x) * smoothFactor;
 
         });
 
@@ -407,12 +460,12 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
         if (usedFallback) {
           if (!gltfLoaderAvailable) {
-            setStatusMessage("GLTFLoader недоступен по CDN, используем встроенную 3D-оправу. Трекинг лица активен.");
+            setStatusMessage("GLTFLoader недоступен по CDN, используем локальную 3D-модель товара. Ожидаем распознавание лица...");
           } else {
-            setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу. Трекинг лица активен.`);
+            setStatusMessage(`Удалённая модель ${modelName || "товара"} недоступна, используем локальную 3D-модель. Ожидаем распознавание лица...`);
           }
         } else {
-          setStatusMessage(`AR активна: ${modelName}`);
+          setStatusMessage(`AR запущена: ${modelName}. Ожидаем распознавание лица...`);
         }
       } catch (arError) {
         const reason = arError instanceof Error ? arError.message : "неизвестная ошибка";
