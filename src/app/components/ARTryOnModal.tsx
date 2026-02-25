@@ -72,9 +72,11 @@ const loadScriptWithFallback = async (urls: string[]) => {
 
 const loadGltfLoaderClass = async () => {
   await loadScriptWithFallback([
+    "https://threejs.org/examples/js/loaders/GLTFLoader.js",
     "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
     "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
     "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r153/examples/js/loaders/GLTFLoader.js",
+    "https://raw.githubusercontent.com/mrdoob/three.js/r153/examples/js/loaders/GLTFLoader.js",
   ]);
 
   if (!window.THREE?.GLTFLoader) {
@@ -235,6 +237,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
       try {
         await loadScriptWithFallback([
+          "https://threejs.org/build/three.min.js",
           "https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js",
           "https://unpkg.com/three@0.153.0/build/three.min.js",
         ]);
@@ -453,6 +456,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const reason = arError instanceof Error ? arError.message : "неизвестная ошибка";
         if (reason.includes("onBuild")) {
           setStatusMessage("AR не инициализирован: конфликт версий GLTFLoader/Three.js. Обновите страницу (Ctrl+F5) и попробуйте снова.");
+        } else if (reason.includes("GLTF_LOADER_UNAVAILABLE") || reason.includes("GLTF_LOADER_INCOMPATIBLE")) {
+          setStatusMessage("Не удалось загрузить GLTFLoader (вероятно блокируется CDN/прокси). Добавьте локальный loader или проверьте доступ к threejs.org/jsDelivr/unpkg.");
         } else if (reason.includes("MODEL_LOAD_FAILED:")) {
           setStatusMessage(`Не удалось загрузить вашу 3D-модель (${reason.replace("MODEL_LOAD_FAILED:", "")}). Проверьте, что файл .glb корректный и доступен по URL.`);
         } else {
