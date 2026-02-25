@@ -11,6 +11,8 @@ const products = [
   {
     id: 1,
     name: "Classic Aviator",
+    arModelName: "Aviator Gold",
+    arModelUrl: "/models/classic-aviator.glb",
     price: "39 900₸",
     rating: 4.9,
     reviews: 127,
@@ -20,6 +22,8 @@ const products = [
   {
     id: 2,
     name: "Modern Round",
+    arModelName: "Round Silver",
+    arModelUrl: "/models/modern-round.glb",
     price: "32 400₸",
     rating: 4.8,
     reviews: 89,
@@ -29,6 +33,8 @@ const products = [
   {
     id: 3,
     name: "Sport Pro",
+    arModelName: "Sport Carbon",
+    arModelUrl: "/models/sport-pro.glb",
     price: "44 900₸",
     rating: 5.0,
     reviews: 156,
@@ -38,6 +44,8 @@ const products = [
   {
     id: 4,
     name: "Vintage Square",
+    arModelName: "Vintage Matte",
+    arModelUrl: "/models/vintage-square.glb",
     price: "29 900₸",
     rating: 4.7,
     reviews: 92,
@@ -47,6 +55,8 @@ const products = [
   {
     id: 5,
     name: "Designer Cat Eye",
+    arModelName: "Cat Eye Premium",
+    arModelUrl: "/models/designer-cat-eye.glb",
     price: "47 400₸",
     rating: 4.9,
     reviews: 143,
@@ -56,6 +66,8 @@ const products = [
   {
     id: 6,
     name: "Urban Wayfarer",
+    arModelName: "Wayfarer Urban",
+    arModelUrl: "/models/urban-wayfarer.glb",
     price: "34 900₸",
     rating: 4.8,
     reviews: 108,
@@ -65,7 +77,7 @@ const products = [
 ];
 
 export function Products() {
-  const [selectedProduct, setSelectedProduct] = useState<{ id: number; name: string } | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<(typeof products)[number] | null>(null);
 
   return (
     <section id="products" className="py-20 bg-slate-900">
@@ -124,7 +136,7 @@ export function Products() {
                   <Button 
                     className="flex-1 bg-emerald-700 hover:bg-emerald-800"
                     variant="outline"
-                    onClick={() => setSelectedProduct({ id: product.id, name: product.name })}
+                    onClick={() => setSelectedProduct(product)}
                   >
                     <Scan className="mr-2 h-4 w-4" />
                     Примерить
@@ -144,6 +156,8 @@ export function Products() {
         isOpen={selectedProduct !== null}
         onClose={() => setSelectedProduct(null)}
         productName={selectedProduct?.name || ""}
+        modelName={selectedProduct?.arModelName || ""}
+        modelUrl={selectedProduct?.arModelUrl || ""}
       />
     </section>
   );
