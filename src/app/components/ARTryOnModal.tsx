@@ -220,10 +220,16 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           "https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js",
           "https://unpkg.com/three@0.153.0/build/three.min.js",
         ]);
-        await loadScriptWithFallback([
-          "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
-          "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
-        ]);
+        let gltfLoaderAvailable = false;
+        try {
+          await loadScriptWithFallback([
+            "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
+            "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
+          ]);
+          gltfLoaderAvailable = true;
+        } catch {
+          gltfLoaderAvailable = false;
+        }
         const faceMeshScriptUrl = await loadScriptWithFallback([
           "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
           "https://unpkg.com/@mediapipe/face_mesh/face_mesh.js",
@@ -296,6 +302,10 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
             throw new Error("missing modelUrl");
           }
 
+          if (!gltfLoaderAvailable || !THREE.GLTFLoader) {
+            throw new Error("GLTF_LOADER_UNAVAILABLE");
+          }
+
           const loader = new THREE.GLTFLoader();
           const gltf = await withTimeout(
             new Promise<any>((resolve, reject) => {
@@ -309,7 +319,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         } catch {
           glasses = createFallbackGlasses();
           usedFallback = true;
-          setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу.`);
+          if (!gltfLoaderAvailable) {
+            setStatusMessage("GLTFLoader недоступен по CDN, используем встроенную 3D-оправу. Трекинг лица активен.");
+          } else {
+            setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу.`);
+          }
         }
 
         glasses.scale.setScalar(1.2);
@@ -392,7 +406,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         faceCamera.start();
 
         if (usedFallback) {
-          setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу. Трекинг лица активен.`);
+          if (!gltfLoaderAvailable) {
+            setStatusMessage("GLTFLoader недоступен по CDN, используем встроенную 3D-оправу. Трекинг лица активен.");
+          } else {
+            setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу. Трекинг лица активен.`);
+          }
         } else {
           setStatusMessage(`AR активна: ${modelName}`);
         }
