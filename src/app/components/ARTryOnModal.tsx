@@ -79,6 +79,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   const faceMeshRef = useRef<any>(null);
   const modelRef = useRef<any>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const faceDetectedRef = useRef(false);
+  const noFaceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [initializing, setInitializing] = useState(false);
@@ -121,11 +123,17 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
       animationFrameRef.current = null;
     }
 
+    if (noFaceTimerRef.current) {
+      clearTimeout(noFaceTimerRef.current);
+      noFaceTimerRef.current = null;
+    }
+
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
 
     modelRef.current = null;
+    faceDetectedRef.current = false;
     setCameraEnabled(false);
     setInitializing(false);
   }, []);
@@ -247,10 +255,10 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
         const createFallbackGlasses = () => {
           const group = new THREE.Group();
-          const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.4, roughness: 0.4 });
-          const bridgeMaterial = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.5, roughness: 0.35 });
+          const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, metalness: 0.4, roughness: 0.35 });
+          const bridgeMaterial = new THREE.MeshStandardMaterial({ color: 0x22d3ee, metalness: 0.5, roughness: 0.3 });
 
-        const leftLens = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.05, 16, 40), frameMaterial);
+          const leftLens = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.05, 16, 40), frameMaterial);
         leftLens.position.set(-0.45, 0, 0);
         const rightLens = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.05, 16, 40), frameMaterial);
         rightLens.position.set(0.45, 0, 0);
@@ -263,9 +271,23 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         rightArm.position.set(0.9, 0.08, -0.05);
         rightArm.rotation.y = -0.45;
 
-        group.add(leftLens, rightLens, bridge, leftArm, rightArm);
-        return group;
-      };
+          group.add(leftLens, rightLens, bridge, leftArm, rightArm);
+          return group;
+        };
+
+        const normalizeModel = (object3D: any) => {
+          const box = new THREE.Box3().setFromObject(object3D);
+          const size = new THREE.Vector3();
+          const center = new THREE.Vector3();
+          box.getSize(size);
+          box.getCenter(center);
+
+          object3D.position.sub(center);
+
+          const maxSize = Math.max(size.x || 1, size.y || 1, size.z || 1);
+          const normalizeScale = 0.8 / maxSize;
+          object3D.scale.multiplyScalar(normalizeScale);
+        };
 
         let glasses: any;
         let usedFallback = false;
@@ -283,15 +305,24 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
             "MODEL_LOAD_TIMEOUT",
           );
           glasses = gltf.scene;
+          normalizeModel(glasses);
         } catch {
           glasses = createFallbackGlasses();
           usedFallback = true;
           setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу.`);
         }
 
-        glasses.scale.setScalar(1.3);
+        glasses.scale.setScalar(1.2);
+        glasses.position.set(0, 0, 0);
         scene.add(glasses);
         modelRef.current = glasses;
+        faceDetectedRef.current = false;
+
+        noFaceTimerRef.current = setTimeout(() => {
+          if (!faceDetectedRef.current) {
+            setStatusMessage("Камера включена, но лицо не найдено. Держите лицо в центре кадра и при хорошем свете.");
+          }
+        }, 4500);
 
         const renderLoop = () => {
           renderer.render(scene, camera);
@@ -315,6 +346,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           if (!results.multiFaceLandmarks?.length || !modelRef.current) {
             return;
           }
+
+          faceDetectedRef.current = true;
 
         const landmarks = results.multiFaceLandmarks[0];
         const leftEye = landmarks[33];
