@@ -371,8 +371,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           throw new Error(`MODEL_LOAD_FAILED:${modelLoadErrorMessage}`);
         }
 
-        glasses.scale.setScalar(2.1);
-        glasses.position.set(0, -0.08, 0.04);
+        glasses.scale.setScalar(1.85);
+        glasses.position.set(0, -0.16, 0.03);
 
         const faceAnchor = new THREE.Group();
         faceAnchor.position.set(0, 0, -2.4);
@@ -444,10 +444,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const smoothFactor = 0.22;
-        const anchorTargetX = ((centerX - 0.5) * 4.7);
-        const anchorTargetY = (-(centerY - 0.5) * 3.05 - 0.24);
-        const anchorTargetZ = (-noseBridge.z * 7.1 - 2.25);
+        const mirroredCenterX = 1 - centerX;
+        const smoothFactor = 0.24;
+        const anchorTargetX = ((mirroredCenterX - 0.5) * 4.2);
+        const anchorTargetY = (-(centerY - 0.5) * 3.0 - 0.36);
+        const anchorTargetZ = (-noseBridge.z * 6.2 - 2.45);
 
         if (faceAnchorRef.current) {
           faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * smoothFactor;
@@ -456,13 +457,13 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         }
 
         const faceWidth = Math.sqrt((rightTemple.x - leftTemple.x) ** 2 + (rightTemple.y - leftTemple.y) ** 2);
-        const targetScale = Math.max(eyeDistance * 32, faceWidth * 18, 2.2);
+        const targetScale = Math.max(eyeDistance * 24, faceWidth * 13, 1.65);
         modelRef.current.scale.x += (targetScale - modelRef.current.scale.x) * smoothFactor;
         modelRef.current.scale.y += (targetScale - modelRef.current.scale.y) * smoothFactor;
         modelRef.current.scale.z = modelRef.current.scale.x;
 
-        const targetRoll = -Math.atan2(dy, dx);
-        const targetYaw = (leftTemple.z - rightTemple.z) * 2.6;
+        const targetRoll = Math.atan2(dy, dx);
+        const targetYaw = (rightTemple.z - leftTemple.z) * 2.2;
         const targetPitch = (chin.y - forehead.y - 0.33) * 2.2;
 
         const rotationTarget = faceAnchorRef.current || modelRef.current;
