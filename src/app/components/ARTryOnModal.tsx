@@ -71,19 +71,31 @@ const loadScriptWithFallback = async (urls: string[]) => {
 };
 
 const loadGltfLoaderClass = async () => {
-  await loadScriptWithFallback([
-    "https://threejs.org/examples/js/loaders/GLTFLoader.js",
-    "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
-    "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
-    "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r153/examples/js/loaders/GLTFLoader.js",
-    "https://raw.githubusercontent.com/mrdoob/three.js/r153/examples/js/loaders/GLTFLoader.js",
-  ]);
+  const moduleUrls = [
+    "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
+    "https://unpkg.com/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
+    "https://raw.githubusercontent.com/mrdoob/three.js/r153/examples/jsm/loaders/GLTFLoader.js",
+  ];
 
-  if (!window.THREE?.GLTFLoader) {
-    throw new Error("GLTF_LOADER_INCOMPATIBLE");
+  let lastError: unknown;
+  for (const moduleUrl of moduleUrls) {
+    try {
+      const moduleExports = await withTimeout(
+        import(/* @vite-ignore */ moduleUrl),
+        9000,
+        `GLTF_MODULE_TIMEOUT:${moduleUrl}`,
+      );
+
+      const loaderClass = moduleExports?.GLTFLoader || moduleExports?.default;
+      if (loaderClass) {
+        return loaderClass;
+      }
+    } catch (error) {
+      lastError = error;
+    }
   }
 
-  return window.THREE.GLTFLoader;
+  throw lastError || new Error("GLTF_LOADER_UNAVAILABLE");
 };
 
 export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl }: ARTryOnModalProps) {
@@ -456,8 +468,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const reason = arError instanceof Error ? arError.message : "неизвестная ошибка";
         if (reason.includes("onBuild")) {
           setStatusMessage("AR не инициализирован: конфликт версий GLTFLoader/Three.js. Обновите страницу (Ctrl+F5) и попробуйте снова.");
-        } else if (reason.includes("GLTF_LOADER_UNAVAILABLE") || reason.includes("GLTF_LOADER_INCOMPATIBLE")) {
-          setStatusMessage("Не удалось загрузить GLTFLoader (вероятно блокируется CDN/прокси). Добавьте локальный loader или проверьте доступ к threejs.org/jsDelivr/unpkg.");
+        } else if (reason.includes("GLTF_LOADER_UNAVAILABLE") || reason.includes("GLTF_LOADER_INCOMPATIBLE") || reason.includes("GLTF_MODULE_TIMEOUT")) {
+          setStatusMessage("Не удалось загрузить GLTFLoader (модуль недоступен из CDN/прокси). Проверьте доступ к jsDelivr/unpkg или используйте локальный хостинг loader-модуля.");
         } else if (reason.includes("MODEL_LOAD_FAILED:")) {
           setStatusMessage(`Не удалось загрузить вашу 3D-модель (${reason.replace("MODEL_LOAD_FAILED:", "")}). Проверьте, что файл .glb корректный и доступен по URL.`);
         } else {
