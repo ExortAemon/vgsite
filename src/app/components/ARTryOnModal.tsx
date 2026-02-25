@@ -71,25 +71,19 @@ const loadScriptWithFallback = async (urls: string[]) => {
 };
 
 const loadGltfLoaderClass = async () => {
-  const moduleUrls = [
-    "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
-    "https://unpkg.com/three@0.153.0/examples/jsm/loaders/GLTFLoader.js?module",
-    "https://esm.sh/three@0.153.0/examples/jsm/loaders/GLTFLoader",
-  ];
+  await loadScriptWithFallback([
+    "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
+    "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
+    "https://threejs.org/examples/js/loaders/GLTFLoader.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/three.js/r153/examples/js/loaders/GLTFLoader.js",
+    "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r153/examples/js/loaders/GLTFLoader.js",
+  ]);
 
-  let lastError: unknown;
-  for (const url of moduleUrls) {
-    try {
-      const gltfModule = await withTimeout(import(/* @vite-ignore */ url), 9000, `GLTF_MODULE_TIMEOUT:${url}`);
-      if (gltfModule?.GLTFLoader) {
-        return gltfModule.GLTFLoader;
-      }
-    } catch (error) {
-      lastError = error;
-    }
+  if (!window.THREE?.GLTFLoader) {
+    throw new Error("GLTF_LOADER_INCOMPATIBLE");
   }
 
-  throw lastError;
+  return window.THREE.GLTFLoader;
 };
 
 export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl }: ARTryOnModalProps) {
