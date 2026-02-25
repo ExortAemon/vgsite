@@ -126,30 +126,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
     cleanup();
     setInitializing(true);
-    setStatusMessage("Запускаем камеру и подгружаем 3D модель...");
+    setStatusMessage("Запрашиваем доступ к камере...");
 
     try {
-      await loadScriptWithFallback([
-        "https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js",
-        "https://unpkg.com/three@0.153.0/build/three.min.js",
-      ]);
-      await loadScriptWithFallback([
-        "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
-        "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
-      ]);
-      await loadScriptWithFallback([
-        "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
-        "https://unpkg.com/@mediapipe/face_mesh/face_mesh.js",
-      ]);
-      await loadScriptWithFallback([
-        "https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js",
-        "https://unpkg.com/@mediapipe/camera_utils/camera_utils.js",
-      ]);
-
-      const THREE = window.THREE;
-      if (!THREE || !window.FaceMesh || !window.Camera) {
-        throw new Error("AR библиотеки не загружены");
-      }
+      const video = videoRef.current;
+      const sceneHost = sceneHostRef.current;
 
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: 1280, height: 720 },
@@ -157,29 +138,54 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
       });
       mediaStreamRef.current = mediaStream;
 
-      const video = videoRef.current;
       video.srcObject = mediaStream;
       await video.play();
+      setCameraEnabled(true);
 
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 1000);
-      camera.position.z = 6;
+      setStatusMessage("Камера включена. Инициализируем AR...");
 
-      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(sceneHostRef.current.clientWidth, sceneHostRef.current.clientHeight);
-      sceneHostRef.current.appendChild(renderer.domElement);
-      rendererRef.current = renderer;
+      try {
+        await loadScriptWithFallback([
+          "https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js",
+          "https://unpkg.com/three@0.153.0/build/three.min.js",
+        ]);
+        await loadScriptWithFallback([
+          "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
+          "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
+        ]);
+        await loadScriptWithFallback([
+          "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
+          "https://unpkg.com/@mediapipe/face_mesh/face_mesh.js",
+        ]);
+        await loadScriptWithFallback([
+          "https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js",
+          "https://unpkg.com/@mediapipe/camera_utils/camera_utils.js",
+        ]);
 
-      scene.add(new THREE.AmbientLight(0xffffff, 1.1));
-      const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      keyLight.position.set(0, 1, 2);
-      scene.add(keyLight);
+        const THREE = window.THREE;
+        if (!THREE || !window.FaceMesh || !window.Camera) {
+          throw new Error("AR библиотеки не загружены");
+        }
 
-      const createFallbackGlasses = () => {
-        const group = new THREE.Group();
-        const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.4, roughness: 0.4 });
-        const bridgeMaterial = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.5, roughness: 0.35 });
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 1000);
+        camera.position.z = 6;
+
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(sceneHost.clientWidth, sceneHost.clientHeight);
+        sceneHost.appendChild(renderer.domElement);
+        rendererRef.current = renderer;
+
+        scene.add(new THREE.AmbientLight(0xffffff, 1.1));
+        const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        keyLight.position.set(0, 1, 2);
+        scene.add(keyLight);
+
+        const createFallbackGlasses = () => {
+          const group = new THREE.Group();
+          const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.4, roughness: 0.4 });
+          const bridgeMaterial = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.5, roughness: 0.35 });
 
         const leftLens = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.05, 16, 40), frameMaterial);
         leftLens.position.set(-0.45, 0, 0);
@@ -198,41 +204,41 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         return group;
       };
 
-      let glasses: any;
-      let usedFallback = false;
-      try {
-        if (!modelUrl) {
-          throw new Error("missing modelUrl");
+        let glasses: any;
+        let usedFallback = false;
+        try {
+          if (!modelUrl) {
+            throw new Error("missing modelUrl");
+          }
+
+          const loader = new THREE.GLTFLoader();
+          const gltf = await new Promise<any>((resolve, reject) => {
+            loader.load(modelUrl, resolve, undefined, reject);
+          });
+          glasses = gltf.scene;
+        } catch {
+          glasses = createFallbackGlasses();
+          usedFallback = true;
+          setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу.`);
         }
 
-        const loader = new THREE.GLTFLoader();
-        const gltf = await new Promise<any>((resolve, reject) => {
-          loader.load(modelUrl, resolve, undefined, reject);
+        glasses.scale.setScalar(1.3);
+        scene.add(glasses);
+        modelRef.current = glasses;
+
+        const faceMesh = new window.FaceMesh({
+          locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
         });
-        glasses = gltf.scene;
-      } catch {
-        glasses = createFallbackGlasses();
-        usedFallback = true;
-        setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу.`);
-      }
+        faceMeshRef.current = faceMesh;
 
-      glasses.scale.setScalar(1.3);
-      scene.add(glasses);
-      modelRef.current = glasses;
+        faceMesh.setOptions({
+          maxNumFaces: 1,
+          refineLandmarks: true,
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.6,
+        });
 
-      const faceMesh = new window.FaceMesh({
-        locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
-      });
-      faceMeshRef.current = faceMesh;
-
-      faceMesh.setOptions({
-        maxNumFaces: 1,
-        refineLandmarks: true,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6,
-      });
-
-      faceMesh.onResults((results: any) => {
+        faceMesh.onResults((results: any) => {
         if (!results.multiFaceLandmarks?.length || !modelRef.current) {
           renderer.render(scene, camera);
           return;
@@ -264,24 +270,26 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         renderer.render(scene, camera);
       });
 
-      const faceCamera = new window.Camera(video, {
-        onFrame: async () => {
-          if (faceMeshRef.current) {
-            await faceMeshRef.current.send({ image: video });
-          }
-        },
-        width: 1280,
-        height: 720,
-      });
+        const faceCamera = new window.Camera(video, {
+          onFrame: async () => {
+            if (faceMeshRef.current) {
+              await faceMeshRef.current.send({ image: video });
+            }
+          },
+          width: 1280,
+          height: 720,
+        });
 
-      cameraLoopRef.current = faceCamera;
-      faceCamera.start();
+        cameraLoopRef.current = faceCamera;
+        faceCamera.start();
 
-      setCameraEnabled(true);
-      if (usedFallback) {
-        setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу. Трекинг лица активен.`);
-      } else {
-        setStatusMessage(`AR активна: ${modelName}`);
+        if (usedFallback) {
+          setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу. Трекинг лица активен.`);
+        } else {
+          setStatusMessage(`AR активна: ${modelName}`);
+        }
+      } catch {
+        setStatusMessage("Камера включена, но AR-трекинг не инициализировался. Попробуйте кнопку «Включить камеру» ещё раз.");
       }
     } catch {
       cleanup();
