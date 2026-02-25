@@ -78,6 +78,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   const cameraLoopRef = useRef<any>(null);
   const faceMeshRef = useRef<any>(null);
   const modelRef = useRef<any>(null);
+  const faceAnchorRef = useRef<any>(null);
   const animationFrameRef = useRef<number | null>(null);
   const faceDetectedRef = useRef(false);
   const noFaceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -134,6 +135,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
     }
 
     modelRef.current = null;
+    faceAnchorRef.current = null;
     faceDetectedRef.current = false;
     trackingConfirmedRef.current = false;
     setCameraEnabled(false);
@@ -227,6 +229,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           await loadScriptWithFallback([
             "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
             "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
+            "https://threejs.org/examples/js/loaders/GLTFLoader.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/three.js/r153/examples/js/loaders/GLTFLoader.js",
           ]);
           gltfLoaderAvailable = true;
         } catch {
@@ -356,8 +360,14 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         }
 
         glasses.scale.setScalar(1.2);
-        glasses.position.set(0, 0, 0);
-        scene.add(glasses);
+        glasses.position.set(0, 0.02, 0.02);
+
+        const faceAnchor = new THREE.Group();
+        faceAnchor.position.set(0, 0, -2.4);
+        faceAnchor.add(glasses);
+        scene.add(faceAnchor);
+
+        faceAnchorRef.current = faceAnchor;
         modelRef.current = glasses;
         faceDetectedRef.current = false;
 
@@ -410,13 +420,14 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           }
 
         const landmarks = results.multiFaceLandmarks[0];
-        const leftEye = landmarks[33];
-        const rightEye = landmarks[263];
+        const leftEye = landmarks[468] || landmarks[33];
+        const rightEye = landmarks[473] || landmarks[263];
         const leftTemple = landmarks[234];
         const rightTemple = landmarks[454];
         const forehead = landmarks[10];
         const chin = landmarks[152];
         const nose = landmarks[1];
+        const noseBridge = landmarks[6] || nose;
 
         const centerX = (leftEye.x + rightEye.x) / 2;
         const centerY = (leftEye.y + rightEye.y) / 2;
@@ -425,13 +436,19 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const smoothFactor = 0.35;
-        modelRef.current.position.x += ((centerX - 0.5) * 5.6 - modelRef.current.position.x) * smoothFactor;
-        modelRef.current.position.y += ((-(centerY - 0.5) * 3.6 + 0.1) - modelRef.current.position.y) * smoothFactor;
-        modelRef.current.position.z += ((-nose.z * 10 - 2.6) - modelRef.current.position.z) * smoothFactor;
+        const smoothFactor = 0.3;
+        const anchorTargetX = ((centerX - 0.5) * 5.2 + (noseBridge.x - centerX) * 2.4);
+        const anchorTargetY = (-(centerY - 0.5) * 3.2 + (0.5 - noseBridge.y) * 1.2 - 0.02);
+        const anchorTargetZ = (-noseBridge.z * 8.5 - 2.15);
+
+        if (faceAnchorRef.current) {
+          faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * smoothFactor;
+          faceAnchorRef.current.position.y += (anchorTargetY - faceAnchorRef.current.position.y) * smoothFactor;
+          faceAnchorRef.current.position.z += (anchorTargetZ - faceAnchorRef.current.position.z) * smoothFactor;
+        }
 
         const faceWidth = Math.sqrt((rightTemple.x - leftTemple.x) ** 2 + (rightTemple.y - leftTemple.y) ** 2);
-        const targetScale = Math.max(eyeDistance * 7.8, faceWidth * 4.8);
+        const targetScale = Math.max(eyeDistance * 7.2, faceWidth * 4.4);
         modelRef.current.scale.x += (targetScale - modelRef.current.scale.x) * smoothFactor;
         modelRef.current.scale.y += (targetScale - modelRef.current.scale.y) * smoothFactor;
         modelRef.current.scale.z = modelRef.current.scale.x;
@@ -439,9 +456,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const targetRoll = -Math.atan2(dy, dx);
         const targetYaw = (leftTemple.z - rightTemple.z) * 5;
         const targetPitch = (chin.y - forehead.y - 0.33) * 4;
-        modelRef.current.rotation.z += (targetRoll - modelRef.current.rotation.z) * smoothFactor;
-        modelRef.current.rotation.y += (targetYaw - modelRef.current.rotation.y) * smoothFactor;
-        modelRef.current.rotation.x += (targetPitch - modelRef.current.rotation.x) * smoothFactor;
+
+        const rotationTarget = faceAnchorRef.current || modelRef.current;
+        rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * smoothFactor;
+        rotationTarget.rotation.y += (targetYaw - rotationTarget.rotation.y) * smoothFactor;
+        rotationTarget.rotation.x += (targetPitch - rotationTarget.rotation.x) * smoothFactor;
 
         });
 
