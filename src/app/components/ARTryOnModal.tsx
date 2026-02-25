@@ -69,6 +69,16 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   const [initializing, setInitializing] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Нажмите «Включить камеру» для запуска AR примерки");
 
+  const waitForSceneElements = useCallback(async () => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      if (videoRef.current && sceneHostRef.current) {
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+    return false;
+  }, []);
+
   const cleanup = useCallback(() => {
     if (cameraLoopRef.current?.stop) {
       cameraLoopRef.current.stop();
@@ -108,8 +118,9 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   }, [cleanup, isOpen]);
 
   const startCamera = useCallback(async () => {
-    if (!videoRef.current || !sceneHostRef.current || !modelUrl) {
-      setStatusMessage("Не удалось запустить AR: отсутствует видео или ссылка на модель.");
+    const elementsReady = await waitForSceneElements();
+    if (!elementsReady || !videoRef.current || !sceneHostRef.current) {
+      setStatusMessage("Не удалось запустить AR: не готов контейнер видео. Нажмите кнопку ещё раз.");
       return;
     }
 
@@ -190,6 +201,10 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
       let glasses: any;
       let usedFallback = false;
       try {
+        if (!modelUrl) {
+          throw new Error("missing modelUrl");
+        }
+
         const loader = new THREE.GLTFLoader();
         const gltf = await new Promise<any>((resolve, reject) => {
           loader.load(modelUrl, resolve, undefined, reject);
@@ -198,7 +213,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
       } catch {
         glasses = createFallbackGlasses();
         usedFallback = true;
-        setStatusMessage(`Модель ${modelName} недоступна, используем встроенную 3D-оправу.`);
+        setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу.`);
       }
 
       glasses.scale.setScalar(1.3);
@@ -264,7 +279,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
       setCameraEnabled(true);
       if (usedFallback) {
-        setStatusMessage(`Модель ${modelName} недоступна, используем встроенную 3D-оправу. Трекинг лица активен.`);
+        setStatusMessage(`Модель ${modelName || "товара"} недоступна, используем встроенную 3D-оправу. Трекинг лица активен.`);
       } else {
         setStatusMessage(`AR активна: ${modelName}`);
       }
@@ -274,7 +289,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
     } finally {
       setInitializing(false);
     }
-  }, [cleanup, modelName, modelUrl]);
+  }, [cleanup, modelName, modelUrl, waitForSceneElements]);
 
   useEffect(() => {
     if (!isOpen) {
