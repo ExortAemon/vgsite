@@ -40,3 +40,22 @@ https://www.figma.com/design/DdDCtqW30NBfNZ6Vzi1eG0/vg
    ```bash
    npm run dev
    ```
+
+## Если в браузере `ERR_CONNECTION_REFUSED` на `localhost:5173`
+
+Это означает, что dev-сервер не запущен (или запущен на другом хосте/порту).
+
+1. Запустите сервер и не закрывайте этот терминал:
+   ```bash
+   npm run dev -- --host 0.0.0.0 --port 5173
+   ```
+2. Проверьте в терминале строку вида:
+   - `Local: http://localhost:5173/`
+3. Если порт занят, запустите на другом порту:
+   ```bash
+   npm run dev -- --host 0.0.0.0 --port 4173
+   ```
+   и откройте `http://localhost:4173`.
+4. Для проверки, что файл модели действительно доступен, откройте:
+   - `http://localhost:5173/models/classic-aviator.glb`
+   - или `http://localhost:4173/models/classic-aviator.glb` (если меняли порт)
