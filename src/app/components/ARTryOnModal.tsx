@@ -337,7 +337,9 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         };
 
         let glasses: any;
+        let loadedModelSource = "";
         let usedFallback = false;
+        let modelLoadErrorMessage = "";
         try {
           if (!modelUrl) {
             throw new Error("missing modelUrl");
@@ -364,6 +366,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
                 9000,
                 `MODEL_LOAD_TIMEOUT:${candidateUrl}`,
               );
+              loadedModelSource = candidateUrl;
               break;
             } catch (error) {
               modelLoadError = error;
@@ -376,14 +379,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
           glasses = gltf.scene;
           normalizeModel(glasses);
-        } catch {
+        } catch (error) {
           glasses = createProductModel();
           usedFallback = true;
-          if (!GLTFLoaderClass) {
-            setStatusMessage("GLTFLoader недоступен по CDN, используем локальную 3D-модель товара. Ожидаем распознавание лица...");
-          } else {
-            setStatusMessage(`Удалённая модель ${modelName || "товара"} недоступна, используем локальную 3D-модель. Ожидаем распознавание лица...`);
-          }
+          modelLoadErrorMessage = error instanceof Error ? error.message : "MODEL_LOAD_FAILED";
+          setStatusMessage(`Модель ${modelName || "товара"} не загрузилась (${modelLoadErrorMessage}). Используем встроенную демо-оправу.`);
         }
 
         glasses.scale.setScalar(1.05);
@@ -440,9 +440,9 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
               noFaceTimerRef.current = null;
             }
             if (usedFallback) {
-              setStatusMessage(`Трекинг лица активен (${modelName || "локальная 3D-модель"}). Двигайте головой для проверки.`);
+              setStatusMessage(`Трекинг лица активен, но используется встроенная демо-оправа (${modelName || "без названия"}).`);
             } else {
-              setStatusMessage(`Трекинг лица активен: ${modelName}`);
+              setStatusMessage(`Трекинг лица активен: ${modelName}. Источник модели: ${loadedModelSource}`);
             }
           }
 
@@ -506,13 +506,9 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         faceCamera.start();
 
         if (usedFallback) {
-          if (!GLTFLoaderClass) {
-            setStatusMessage("GLTFLoader недоступен по CDN, используем локальную 3D-модель товара. Ожидаем распознавание лица...");
-          } else {
-            setStatusMessage(`Удалённая модель ${modelName || "товара"} недоступна, используем локальную 3D-модель. Ожидаем распознавание лица...`);
-          }
+          setStatusMessage(`AR запущена с встроенной демо-оправой: не удалось загрузить ${modelName || "модель"}.`);
         } else {
-          setStatusMessage(`AR запущена: ${modelName}. Ожидаем распознавание лица...`);
+          setStatusMessage(`AR запущена: ${modelName}. Загружено из ${loadedModelSource}.`);
         }
       } catch (arError) {
         const reason = arError instanceof Error ? arError.message : "неизвестная ошибка";
