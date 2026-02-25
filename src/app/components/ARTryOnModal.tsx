@@ -71,7 +71,26 @@ const loadScriptWithFallback = async (urls: string[]) => {
 };
 
 const loadGltfLoaderClass = async () => {
+  const legacyScriptUrls = [
+    "/vendor/GLTFLoader.js",
+    "https://threejs.org/examples/js/loaders/GLTFLoader.js",
+    "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
+    "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
+    "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r153/examples/js/loaders/GLTFLoader.js",
+    "https://raw.githubusercontent.com/mrdoob/three.js/r153/examples/js/loaders/GLTFLoader.js",
+  ];
+
+  try {
+    await loadScriptWithFallback(legacyScriptUrls);
+    if (window.THREE?.GLTFLoader) {
+      return window.THREE.GLTFLoader;
+    }
+  } catch {
+    // try ESM fallbacks below
+  }
+
   const moduleUrls = [
+    "/vendor/GLTFLoader.module.js",
     "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
     "https://unpkg.com/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
     "https://raw.githubusercontent.com/mrdoob/three.js/r153/examples/jsm/loaders/GLTFLoader.js",
@@ -249,6 +268,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
       try {
         await loadScriptWithFallback([
+          "/vendor/three.min.js",
           "https://threejs.org/build/three.min.js",
           "https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js",
           "https://unpkg.com/three@0.153.0/build/three.min.js",
@@ -469,7 +489,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         if (reason.includes("onBuild")) {
           setStatusMessage("AR не инициализирован: конфликт версий GLTFLoader/Three.js. Обновите страницу (Ctrl+F5) и попробуйте снова.");
         } else if (reason.includes("GLTF_LOADER_UNAVAILABLE") || reason.includes("GLTF_LOADER_INCOMPATIBLE") || reason.includes("GLTF_MODULE_TIMEOUT")) {
-          setStatusMessage("Не удалось загрузить GLTFLoader (модуль недоступен из CDN/прокси). Проверьте доступ к jsDelivr/unpkg или используйте локальный хостинг loader-модуля.");
+          setStatusMessage("Не удалось загрузить GLTFLoader. Положите /public/vendor/three.min.js и /public/vendor/GLTFLoader.js (или GLTFLoader.module.js), затем перезапустите dev-сервер.");
         } else if (reason.includes("MODEL_LOAD_FAILED:")) {
           setStatusMessage(`Не удалось загрузить вашу 3D-модель (${reason.replace("MODEL_LOAD_FAILED:", "")}). Проверьте, что файл .glb корректный и доступен по URL.`);
         } else {

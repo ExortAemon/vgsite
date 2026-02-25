@@ -59,3 +59,15 @@ https://www.figma.com/design/DdDCtqW30NBfNZ6Vzi1eG0/vg
 4. Для проверки, что файл модели действительно доступен, откройте:
    - `http://localhost:5173/models/classic-aviator.glb`
    - или `http://localhost:4173/models/classic-aviator.glb` (если меняли порт)
+
+## Если ошибка: не удалось загрузить GLTFLoader
+
+Если в вашей сети блокируются CDN, добавьте локальные vendor-файлы:
+
+1. Создайте папку `public/vendor`.
+2. Положите туда:
+   - `three.min.js`
+   - `GLTFLoader.js` **или** `GLTFLoader.module.js`
+3. Перезапустите dev-сервер `npm run dev`.
+
+Подробности: `public/vendor/README.md`.
