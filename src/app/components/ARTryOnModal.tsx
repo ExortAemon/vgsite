@@ -273,55 +273,6 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         keyLight.position.set(0, 1, 2);
         scene.add(keyLight);
 
-        const createProductModel = () => {
-          const presetKey = (modelName || productName || "default").toLowerCase();
-          const isRound = presetKey.includes("round");
-          const isSport = presetKey.includes("sport");
-          const isVintage = presetKey.includes("vintage") || presetKey.includes("square");
-          const isCatEye = presetKey.includes("cat") || presetKey.includes("designer");
-          const isAviator = presetKey.includes("aviator");
-
-          const group = new THREE.Group();
-          const baseColor = isSport ? 0xf97316 : isVintage ? 0x0f172a : isCatEye ? 0xdc2626 : isAviator ? 0xf59e0b : 0x0ea5e9;
-          const accentColor = isSport ? 0xfb7185 : isVintage ? 0x64748b : isCatEye ? 0xfda4af : isAviator ? 0xfcd34d : 0x22d3ee;
-          const frameMaterial = new THREE.MeshStandardMaterial({ color: baseColor, metalness: 0.5, roughness: 0.35 });
-          const bridgeMaterial = new THREE.MeshStandardMaterial({ color: accentColor, metalness: 0.55, roughness: 0.3 });
-
-          const lensGeometry = isRound
-            ? new THREE.TorusGeometry(0.3, 0.045, 16, 40)
-            : isSport
-              ? new THREE.TorusGeometry(0.37, 0.042, 12, 36)
-              : isCatEye
-                ? new THREE.TorusGeometry(0.33, 0.045, 16, 36)
-                : isVintage
-                  ? new THREE.TorusGeometry(0.31, 0.05, 14, 32)
-                  : new THREE.TorusGeometry(0.35, 0.05, 16, 40);
-
-          const leftLens = new THREE.Mesh(lensGeometry, frameMaterial);
-          leftLens.position.set(-0.45, isCatEye ? 0.03 : 0, 0);
-          if (isCatEye) leftLens.rotation.z = 0.16;
-          const rightLens = new THREE.Mesh(lensGeometry, frameMaterial);
-          rightLens.position.set(0.45, isCatEye ? 0.03 : 0, 0);
-          if (isCatEye) rightLens.rotation.z = -0.16;
-
-          const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.05), bridgeMaterial);
-          bridge.position.set(0, isAviator ? -0.02 : 0, 0);
-
-          const leftArm = new THREE.Mesh(new THREE.BoxGeometry(isSport ? 0.65 : 0.55, 0.04, 0.04), frameMaterial);
-          leftArm.position.set(-0.92, 0.08, -0.05);
-          leftArm.rotation.y = 0.45;
-          const rightArm = new THREE.Mesh(new THREE.BoxGeometry(isSport ? 0.65 : 0.55, 0.04, 0.04), frameMaterial);
-          rightArm.position.set(0.92, 0.08, -0.05);
-          rightArm.rotation.y = -0.45;
-
-          const topBar = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.035, 0.04), bridgeMaterial);
-          topBar.position.set(0, isAviator ? 0.28 : 0.24, 0);
-
-          group.add(topBar);
-          group.add(leftLens, rightLens, bridge, leftArm, rightArm);
-          return group;
-        };
-
         const normalizeModel = (object3D: any) => {
           const box = new THREE.Box3().setFromObject(object3D);
           const size = new THREE.Vector3();
@@ -338,7 +289,6 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
         let glasses: any;
         let loadedModelSource = "";
-        let usedFallback = false;
         let modelLoadErrorMessage = "";
         try {
           if (!modelUrl) {
@@ -380,10 +330,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           glasses = gltf.scene;
           normalizeModel(glasses);
         } catch (error) {
-          glasses = createProductModel();
-          usedFallback = true;
           modelLoadErrorMessage = error instanceof Error ? error.message : "MODEL_LOAD_FAILED";
-          setStatusMessage(`Модель ${modelName || "товара"} не загрузилась (${modelLoadErrorMessage}). Используем встроенную демо-оправу.`);
+          throw new Error(`MODEL_LOAD_FAILED:${modelLoadErrorMessage}`);
         }
 
         glasses.scale.setScalar(1.05);
@@ -439,11 +387,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
               clearTimeout(noFaceTimerRef.current);
               noFaceTimerRef.current = null;
             }
-            if (usedFallback) {
-              setStatusMessage(`Трекинг лица активен, но используется встроенная демо-оправа (${modelName || "без названия"}).`);
-            } else {
-              setStatusMessage(`Трекинг лица активен: ${modelName}. Источник модели: ${loadedModelSource}`);
-            }
+            setStatusMessage(`Трекинг лица активен: ${modelName}. Источник модели: ${loadedModelSource}`);
           }
 
         const landmarks = results.multiFaceLandmarks[0];
@@ -463,9 +407,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const mirroredCenterX = 1 - centerX;
         const smoothFactor = 0.22;
-        const anchorTargetX = ((mirroredCenterX - 0.5) * 4.7);
+        const anchorTargetX = ((centerX - 0.5) * 4.7);
         const anchorTargetY = (-(centerY - 0.5) * 3.05 - 0.24);
         const anchorTargetZ = (-noseBridge.z * 7.1 - 2.25);
 
@@ -505,15 +448,13 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         cameraLoopRef.current = faceCamera;
         faceCamera.start();
 
-        if (usedFallback) {
-          setStatusMessage(`AR запущена с встроенной демо-оправой: не удалось загрузить ${modelName || "модель"}.`);
-        } else {
-          setStatusMessage(`AR запущена: ${modelName}. Загружено из ${loadedModelSource}.`);
-        }
+        setStatusMessage(`AR запущена: ${modelName}. Загружено из ${loadedModelSource}.`);
       } catch (arError) {
         const reason = arError instanceof Error ? arError.message : "неизвестная ошибка";
         if (reason.includes("onBuild")) {
           setStatusMessage("AR не инициализирован: конфликт версий GLTFLoader/Three.js. Обновите страницу (Ctrl+F5) и попробуйте снова.");
+        } else if (reason.includes("MODEL_LOAD_FAILED:")) {
+          setStatusMessage(`Не удалось загрузить вашу 3D-модель (${reason.replace("MODEL_LOAD_FAILED:", "")}). Проверьте, что файл .glb корректный и доступен по URL.`);
         } else {
           setStatusMessage(`Камера включена, но AR-трекинг не инициализировался (${reason}). Нажмите «Включить камеру» ещё раз.`);
         }
