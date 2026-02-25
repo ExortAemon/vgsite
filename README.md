@@ -64,10 +64,17 @@ https://www.figma.com/design/DdDCtqW30NBfNZ6Vzi1eG0/vg
 
 Если в вашей сети блокируются CDN, добавьте локальные vendor-файлы:
 
-1. Создайте папку `public/vendor`.
-2. Положите туда:
-   - `three.min.js`
-   - `GLTFLoader.js` **или** `GLTFLoader.module.js`
-3. Перезапустите dev-сервер `npm run dev`.
+1. Убедитесь, что зависимости установлены:
+   ```bash
+   npm install
+   ```
+2. Автоматически скопируйте vendor-файлы из `node_modules/three`:
+   ```bash
+   npm run prepare:vendor
+   ```
+3. Перезапустите dev-сервер:
+   ```bash
+   npm run dev
+   ```
 
 Подробности: `public/vendor/README.md`.
