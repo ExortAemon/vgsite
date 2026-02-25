@@ -62,7 +62,7 @@ const loadScriptWithFallback = async (urls: string[]) => {
   for (const url of urls) {
     try {
       await withTimeout(loadScript(url), 9000, `SCRIPT_TIMEOUT:${url}`);
-      return;
+      return url;
     } catch (error) {
       lastError = error;
     }
@@ -224,7 +224,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
           "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
         ]);
-        await loadScriptWithFallback([
+        const faceMeshScriptUrl = await loadScriptWithFallback([
           "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
           "https://unpkg.com/@mediapipe/face_mesh/face_mesh.js",
         ]);
@@ -330,8 +330,12 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         };
         renderLoop();
 
+        const faceMeshAssetsBase = faceMeshScriptUrl
+          ? faceMeshScriptUrl.replace(/face_mesh\.js.*$/, "")
+          : "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/";
+
         const faceMesh = new window.FaceMesh({
-          locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+          locateFile: (file: string) => `${faceMeshAssetsBase}${file}`,
         });
         faceMeshRef.current = faceMesh;
 
@@ -392,8 +396,9 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         } else {
           setStatusMessage(`AR активна: ${modelName}`);
         }
-      } catch {
-        setStatusMessage("Камера включена, но AR-трекинг не инициализировался. Проверьте интернет/CDN и нажмите «Включить камеру» ещё раз.");
+      } catch (arError) {
+        const reason = arError instanceof Error ? arError.message : "неизвестная ошибка";
+        setStatusMessage(`Камера включена, но AR-трекинг не инициализировался (${reason}). Нажмите «Включить камеру» ещё раз.`);
       }
     } catch (error) {
       cleanup();
