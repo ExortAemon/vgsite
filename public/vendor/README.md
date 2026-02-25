@@ -20,3 +20,5 @@ npm run prepare:vendor
 - `/vendor/GLTFLoader.module.js`
 
 После добавления файлов перезапустите dev-сервер (`npm run dev`).
+
+Дополнительно AR пробует ESM-зеркала `esm.sh` и `jspm`, если классические CDN недоступны.
