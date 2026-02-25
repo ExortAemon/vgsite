@@ -42,11 +42,26 @@ const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
   document.body.appendChild(script);
 });
 
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, message: string) => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
+
 const loadScriptWithFallback = async (urls: string[]) => {
   let lastError: unknown;
   for (const url of urls) {
     try {
-      await loadScript(url);
+      await withTimeout(loadScript(url), 9000, `SCRIPT_TIMEOUT:${url}`);
       return;
     } catch (error) {
       lastError = error;
@@ -117,6 +132,18 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   }, [cleanup, isOpen]);
 
   const getCameraErrorMessage = useCallback((error: unknown) => {
+    if (error instanceof Error) {
+      if (error.message === "INSECURE_CONTEXT") {
+        return "Камера недоступна: откройте сайт по HTTPS или localhost.";
+      }
+      if (error.message === "BROWSER_UNSUPPORTED") {
+        return "Ваш браузер не поддерживает доступ к камере (getUserMedia).";
+      }
+      if (error.message === "CAMERA_PERMISSION_TIMEOUT") {
+        return "Нет ответа на запрос камеры. Проверьте блокировку разрешений камеры в браузере и попробуйте снова.";
+      }
+    }
+
     const mediaError = error as DOMException | undefined;
     if (!window.isSecureContext) {
       return "Камера недоступна: нужен HTTPS (или localhost).";
@@ -148,13 +175,24 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
     setStatusMessage("Запрашиваем доступ к камере...");
 
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("BROWSER_UNSUPPORTED");
+      }
+      if (!window.isSecureContext) {
+        throw new Error("INSECURE_CONTEXT");
+      }
+
       const video = videoRef.current;
       const sceneHost = sceneHostRef.current;
 
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 1280, height: 720 },
-        audio: false,
-      });
+      const mediaStream = await withTimeout(
+        navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: 1280, height: 720 },
+          audio: false,
+        }),
+        12000,
+        "CAMERA_PERMISSION_TIMEOUT",
+      );
       mediaStreamRef.current = mediaStream;
 
       video.srcObject = mediaStream;
@@ -308,7 +346,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           setStatusMessage(`AR активна: ${modelName}`);
         }
       } catch {
-        setStatusMessage("Камера включена, но AR-трекинг не инициализировался. Попробуйте кнопку «Включить камеру» ещё раз.");
+        setStatusMessage("Камера включена, но AR-трекинг не инициализировался. Проверьте интернет/CDN и нажмите «Включить камеру» ещё раз.");
       }
     } catch (error) {
       cleanup();
