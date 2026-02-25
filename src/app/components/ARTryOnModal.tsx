@@ -63,11 +63,10 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   const cameraLoopRef = useRef<any>(null);
   const faceMeshRef = useRef<any>(null);
   const modelRef = useRef<any>(null);
-  const autoStartAttemptedRef = useRef(false);
 
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [initializing, setInitializing] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("Нажмите «Включить камеру» для запуска AR примерки");
+  const [statusMessage, setStatusMessage] = useState("Нажмите «Включить камеру» и разрешите доступ к камере");
 
   const waitForSceneElements = useCallback(async () => {
     for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -113,9 +112,29 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   useEffect(() => {
     if (!isOpen) {
       cleanup();
-      setStatusMessage("Нажмите «Включить камеру» для запуска AR примерки");
+      setStatusMessage("Нажмите «Включить камеру» и разрешите доступ к камере");
     }
   }, [cleanup, isOpen]);
+
+  const getCameraErrorMessage = useCallback((error: unknown) => {
+    const mediaError = error as DOMException | undefined;
+    if (!window.isSecureContext) {
+      return "Камера недоступна: нужен HTTPS (или localhost).";
+    }
+    if (!mediaError?.name) {
+      return "Не удалось включить камеру. Разрешите доступ и попробуйте снова.";
+    }
+    if (mediaError.name === "NotAllowedError") {
+      return "Доступ к камере запрещён. Разрешите камеру в адресной строке браузера и попробуйте снова.";
+    }
+    if (mediaError.name === "NotFoundError") {
+      return "Камера не найдена. Подключите камеру и попробуйте снова.";
+    }
+    if (mediaError.name === "NotReadableError") {
+      return "Камера занята другим приложением. Закройте другие приложения и повторите.";
+    }
+    return `Не удалось включить камеру (${mediaError.name}).`;
+  }, []);
 
   const startCamera = useCallback(async () => {
     const elementsReady = await waitForSceneElements();
@@ -291,25 +310,13 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
       } catch {
         setStatusMessage("Камера включена, но AR-трекинг не инициализировался. Попробуйте кнопку «Включить камеру» ещё раз.");
       }
-    } catch {
+    } catch (error) {
       cleanup();
-      setStatusMessage("Не удалось включить камеру. Разрешите доступ к камере и попробуйте снова.");
+      setStatusMessage(getCameraErrorMessage(error));
     } finally {
       setInitializing(false);
     }
-  }, [cleanup, modelName, modelUrl, waitForSceneElements]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      autoStartAttemptedRef.current = false;
-      return;
-    }
-
-    if (!autoStartAttemptedRef.current) {
-      autoStartAttemptedRef.current = true;
-      void startCamera();
-    }
-  }, [isOpen, startCamera]);
+  }, [cleanup, getCameraErrorMessage, modelName, modelUrl, waitForSceneElements]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
