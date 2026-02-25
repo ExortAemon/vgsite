@@ -78,6 +78,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   const cameraLoopRef = useRef<any>(null);
   const faceMeshRef = useRef<any>(null);
   const modelRef = useRef<any>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [initializing, setInitializing] = useState(false);
@@ -114,6 +115,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
       rendererRef.current.domElement?.remove();
     }
     rendererRef.current = null;
+
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
 
     if (videoRef.current) {
       videoRef.current.srcObject = null;
@@ -269,9 +275,13 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           }
 
           const loader = new THREE.GLTFLoader();
-          const gltf = await new Promise<any>((resolve, reject) => {
-            loader.load(modelUrl, resolve, undefined, reject);
-          });
+          const gltf = await withTimeout(
+            new Promise<any>((resolve, reject) => {
+              loader.load(modelUrl, resolve, undefined, reject);
+            }),
+            9000,
+            "MODEL_LOAD_TIMEOUT",
+          );
           glasses = gltf.scene;
         } catch {
           glasses = createFallbackGlasses();
@@ -282,6 +292,12 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         glasses.scale.setScalar(1.3);
         scene.add(glasses);
         modelRef.current = glasses;
+
+        const renderLoop = () => {
+          renderer.render(scene, camera);
+          animationFrameRef.current = requestAnimationFrame(renderLoop);
+        };
+        renderLoop();
 
         const faceMesh = new window.FaceMesh({
           locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
@@ -296,10 +312,9 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         });
 
         faceMesh.onResults((results: any) => {
-        if (!results.multiFaceLandmarks?.length || !modelRef.current) {
-          renderer.render(scene, camera);
-          return;
-        }
+          if (!results.multiFaceLandmarks?.length || !modelRef.current) {
+            return;
+          }
 
         const landmarks = results.multiFaceLandmarks[0];
         const leftEye = landmarks[33];
@@ -324,8 +339,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const targetRotation = -Math.atan2(dy, dx);
         modelRef.current.rotation.z += (targetRotation - modelRef.current.rotation.z) * smoothFactor;
 
-        renderer.render(scene, camera);
-      });
+        });
 
         const faceCamera = new window.Camera(video, {
           onFrame: async () => {
