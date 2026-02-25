@@ -42,6 +42,19 @@ const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
   document.body.appendChild(script);
 });
 
+const loadScriptWithFallback = async (urls: string[]) => {
+  let lastError: unknown;
+  for (const url of urls) {
+    try {
+      await loadScript(url);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+};
+
 export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl }: ARTryOnModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const sceneHostRef = useRef<HTMLDivElement>(null);
@@ -50,6 +63,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   const cameraLoopRef = useRef<any>(null);
   const faceMeshRef = useRef<any>(null);
   const modelRef = useRef<any>(null);
+  const autoStartAttemptedRef = useRef(false);
 
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [initializing, setInitializing] = useState(false);
@@ -104,10 +118,22 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
     setStatusMessage("Запускаем камеру и подгружаем 3D модель...");
 
     try {
-      await loadScript("https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js");
-      await loadScript("https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js");
-      await loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js");
-      await loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
+      await loadScriptWithFallback([
+        "https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js",
+        "https://unpkg.com/three@0.153.0/build/three.min.js",
+      ]);
+      await loadScriptWithFallback([
+        "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
+        "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
+      ]);
+      await loadScriptWithFallback([
+        "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
+        "https://unpkg.com/@mediapipe/face_mesh/face_mesh.js",
+      ]);
+      await loadScriptWithFallback([
+        "https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js",
+        "https://unpkg.com/@mediapipe/camera_utils/camera_utils.js",
+      ]);
 
       const THREE = window.THREE;
       if (!THREE || !window.FaceMesh || !window.Camera) {
@@ -139,11 +165,42 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
       keyLight.position.set(0, 1, 2);
       scene.add(keyLight);
 
-      const loader = new THREE.GLTFLoader();
-      const gltf = await new Promise<any>((resolve, reject) => {
-        loader.load(modelUrl, resolve, undefined, reject);
-      });
-      const glasses = gltf.scene;
+      const createFallbackGlasses = () => {
+        const group = new THREE.Group();
+        const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.4, roughness: 0.4 });
+        const bridgeMaterial = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.5, roughness: 0.35 });
+
+        const leftLens = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.05, 16, 40), frameMaterial);
+        leftLens.position.set(-0.45, 0, 0);
+        const rightLens = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.05, 16, 40), frameMaterial);
+        rightLens.position.set(0.45, 0, 0);
+        const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.06, 0.05), bridgeMaterial);
+        bridge.position.set(0, 0, 0);
+        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.04), frameMaterial);
+        leftArm.position.set(-0.9, 0.08, -0.05);
+        leftArm.rotation.y = 0.45;
+        const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.04), frameMaterial);
+        rightArm.position.set(0.9, 0.08, -0.05);
+        rightArm.rotation.y = -0.45;
+
+        group.add(leftLens, rightLens, bridge, leftArm, rightArm);
+        return group;
+      };
+
+      let glasses: any;
+      let usedFallback = false;
+      try {
+        const loader = new THREE.GLTFLoader();
+        const gltf = await new Promise<any>((resolve, reject) => {
+          loader.load(modelUrl, resolve, undefined, reject);
+        });
+        glasses = gltf.scene;
+      } catch {
+        glasses = createFallbackGlasses();
+        usedFallback = true;
+        setStatusMessage(`Модель ${modelName} недоступна, используем встроенную 3D-оправу.`);
+      }
+
       glasses.scale.setScalar(1.3);
       scene.add(glasses);
       modelRef.current = glasses;
@@ -206,7 +263,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
       faceCamera.start();
 
       setCameraEnabled(true);
-      setStatusMessage(`AR активна: ${modelName}`);
+      if (usedFallback) {
+        setStatusMessage(`Модель ${modelName} недоступна, используем встроенную 3D-оправу. Трекинг лица активен.`);
+      } else {
+        setStatusMessage(`AR активна: ${modelName}`);
+      }
     } catch {
       cleanup();
       setStatusMessage("Не удалось включить камеру. Разрешите доступ к камере и попробуйте снова.");
@@ -214,6 +275,18 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
       setInitializing(false);
     }
   }, [cleanup, modelName, modelUrl]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      autoStartAttemptedRef.current = false;
+      return;
+    }
+
+    if (!autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void startCamera();
+    }
+  }, [isOpen, startCamera]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
