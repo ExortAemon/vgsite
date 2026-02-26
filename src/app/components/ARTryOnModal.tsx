@@ -465,8 +465,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         modelRef.current.scale.z = modelRef.current.scale.x;
 
         const targetRoll = Math.atan2(dy, dx);
-        const targetYaw = (leftTemple.z - rightTemple.z) * 1.4;
-        const targetPitch = (chin.y - forehead.y - 0.33) * 2.2;
+        const targetYaw = (rightTemple.z - leftTemple.z) * 1.4;
+        const targetPitch = -(chin.y - forehead.y - 0.33) * 2.2;
 
         const rotationTarget = faceAnchorRef.current || modelRef.current;
         rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * smoothFactor;
