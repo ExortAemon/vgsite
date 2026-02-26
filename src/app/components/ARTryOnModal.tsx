@@ -371,7 +371,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           throw new Error(`MODEL_LOAD_FAILED:${modelLoadErrorMessage}`);
         }
 
-        glasses.scale.setScalar(1.85);
+        glasses.scale.setScalar(9.25);
         glasses.position.set(0, -0.16, 0.03);
 
         const faceAnchor = new THREE.Group();
@@ -459,7 +459,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const templeDy = rightTemple.y - leftTemple.y;
         const templeDz = rightTemple.z - leftTemple.z;
         const faceWidth = Math.sqrt((templeDx ** 2) + (templeDy ** 2) + (templeDz ** 2));
-        const targetScale = Math.max(eyeDistance * 30, faceWidth * 16, 2.1);
+        const targetScale = Math.max(eyeDistance * 150, faceWidth * 80, 10.5);
         modelRef.current.scale.x += (targetScale - modelRef.current.scale.x) * smoothFactor;
         modelRef.current.scale.y += (targetScale - modelRef.current.scale.y) * smoothFactor;
         modelRef.current.scale.z = modelRef.current.scale.x;
