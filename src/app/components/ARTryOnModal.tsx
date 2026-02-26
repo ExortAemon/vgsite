@@ -441,6 +441,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const leftEar = landmarks[127] || leftTemple;
         const rightEar = landmarks[356] || rightTemple;
 
+        const centerX = (leftEye.x + rightEye.x) / 2;
+
         const dx = rightEye.x - leftEye.x;
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
