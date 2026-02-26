@@ -372,7 +372,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         }
 
         glasses.scale.setScalar(9.25);
-        glasses.position.set(0, -0.22, 0.03);
+        glasses.position.set(0, -0.24, 0.08);
         glasses.rotation.x = -0.12;
 
         const faceAnchor = new THREE.Group();
@@ -438,17 +438,19 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const nose = landmarks[1];
         const noseBridge = landmarks[6] || nose;
 
-        const centerX = (leftEye.x + rightEye.x) / 2;
-        const centerY = (leftEye.y + rightEye.y) / 2;
+        const leftEar = landmarks[127] || leftTemple;
+        const rightEar = landmarks[356] || rightTemple;
 
         const dx = rightEye.x - leftEye.x;
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const smoothFactor = 0.24;
-        const anchorTargetX = ((noseBridge.x - 0.5) * 4.4);
+        const smoothFactor = 0.26;
+        const mirroredNoseX = 1 - noseBridge.x;
+        const yawAmount = rightTemple.z - leftTemple.z;
+        const anchorTargetX = ((mirroredNoseX - 0.5) * 4.4);
         const anchorTargetY = (-(noseBridge.y - 0.5) * 3.1 - 0.34);
-        const anchorTargetZ = (-noseBridge.z * 7.2 - 2.15);
+        const anchorTargetZ = (-noseBridge.z * 8.2 - 2.05 + Math.abs(yawAmount) * 0.55);
 
         if (faceAnchorRef.current) {
           faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * smoothFactor;
@@ -460,15 +462,25 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const templeDy = rightTemple.y - leftTemple.y;
         const templeDz = rightTemple.z - leftTemple.z;
         const faceWidth = Math.sqrt((templeDx ** 2) + (templeDy ** 2) + (templeDz ** 2));
-        const targetScale = Math.max(eyeDistance * 150, faceWidth * 80, 10.5);
-        const targetScaleX = targetScale * 1.12;
+        const earDx = rightEar.x - leftEar.x;
+        const earDy = rightEar.y - leftEar.y;
+        const earDz = rightEar.z - leftEar.z;
+        const earDistance = Math.sqrt((earDx ** 2) + (earDy ** 2) + (earDz ** 2));
+        const targetScale = Math.max(eyeDistance * 165, faceWidth * 90, earDistance * 90, 11.5);
+        const targetScaleX = targetScale * 1.14;
         modelRef.current.scale.x += (targetScaleX - modelRef.current.scale.x) * smoothFactor;
         modelRef.current.scale.y += (targetScale - modelRef.current.scale.y) * smoothFactor;
         modelRef.current.scale.z += (targetScale - modelRef.current.scale.z) * smoothFactor;
 
-        const targetRoll = Math.atan2(dy, dx);
-        const targetYaw = (rightTemple.z - leftTemple.z) * 1.4;
+        const targetRoll = -Math.atan2(dy, dx);
+        const targetYaw = yawAmount * 1.9;
         const targetPitch = -(chin.y - forehead.y - 0.33) * 2.2;
+
+        const targetModelZOffset = 0.08 + Math.abs(targetYaw) * 0.16;
+        modelRef.current.position.z += (targetModelZOffset - modelRef.current.position.z) * smoothFactor;
+
+        const targetModelYOffset = -0.24 - Math.abs(targetPitch) * 0.03;
+        modelRef.current.position.y += (targetModelYOffset - modelRef.current.position.y) * smoothFactor;
 
         const rotationTarget = faceAnchorRef.current || modelRef.current;
         rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * smoothFactor;
