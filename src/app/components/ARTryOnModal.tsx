@@ -91,7 +91,10 @@ const loadGltfLoaderClass = async () => {
 
   const moduleUrls = [
     "/vendor/GLTFLoader.module.js",
+    "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/loaders/GLTFLoader.js?module",
     "https://esm.sh/three@0.153.0/examples/jsm/loaders/GLTFLoader.js?bundle",
+    "https://esm.run/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
+    "https://cdn.skypack.dev/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
     "https://ga.jspm.io/npm:three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
     "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
     "https://unpkg.com/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
@@ -506,7 +509,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         if (reason.includes("onBuild")) {
           setStatusMessage("AR не инициализирован: конфликт версий GLTFLoader/Three.js. Обновите страницу (Ctrl+F5) и попробуйте снова.");
         } else if (reason.includes("GLTF_LOADER_UNAVAILABLE") || reason.includes("GLTF_LOADER_INCOMPATIBLE") || reason.includes("GLTF_MODULE_TIMEOUT")) {
-          setStatusMessage("Не удалось загрузить GLTFLoader. Проверьте /vendor/three.min.js и /vendor/GLTFLoader.js, либо доступ к esm.sh/jspm/jsDelivr/unpkg.");
+          setStatusMessage("Не удалось загрузить GLTFLoader. Проверьте локальные /vendor/three.min.js + /vendor/GLTFLoader.js (или .module.js), либо доступ к esm.sh/esm.run/skypack/jspm/jsDelivr/unpkg.");
         } else if (reason.includes("MODEL_LOAD_FAILED:")) {
           setStatusMessage(`Не удалось загрузить вашу 3D-модель (${reason.replace("MODEL_LOAD_FAILED:", "")}). Проверьте, что файл .glb корректный и доступен по URL.`);
         } else {
