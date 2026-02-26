@@ -371,6 +371,9 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           normalizeModel(glasses);
         } catch (error) {
           modelLoadErrorMessage = error instanceof Error ? error.message : "MODEL_LOAD_FAILED";
+          if (modelLoadErrorMessage.includes("GLTF_LOADER_UNAVAILABLE") || modelLoadErrorMessage.includes("GLTF_LOADER_INCOMPATIBLE") || modelLoadErrorMessage.includes("GLTF_MODULE_TIMEOUT")) {
+            throw new Error(modelLoadErrorMessage);
+          }
           throw new Error(`MODEL_LOAD_FAILED:${modelLoadErrorMessage}`);
         }
 
