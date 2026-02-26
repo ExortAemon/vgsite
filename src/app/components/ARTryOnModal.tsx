@@ -372,7 +372,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         }
 
         glasses.scale.setScalar(9.25);
-        glasses.position.set(0, -0.16, 0.03);
+        glasses.position.set(0, -0.22, 0.03);
+        glasses.rotation.x = -0.12;
 
         const faceAnchor = new THREE.Group();
         faceAnchor.position.set(0, 0, -2.4);
@@ -460,9 +461,10 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const templeDz = rightTemple.z - leftTemple.z;
         const faceWidth = Math.sqrt((templeDx ** 2) + (templeDy ** 2) + (templeDz ** 2));
         const targetScale = Math.max(eyeDistance * 150, faceWidth * 80, 10.5);
-        modelRef.current.scale.x += (targetScale - modelRef.current.scale.x) * smoothFactor;
+        const targetScaleX = targetScale * 1.12;
+        modelRef.current.scale.x += (targetScaleX - modelRef.current.scale.x) * smoothFactor;
         modelRef.current.scale.y += (targetScale - modelRef.current.scale.y) * smoothFactor;
-        modelRef.current.scale.z = modelRef.current.scale.x;
+        modelRef.current.scale.z += (targetScale - modelRef.current.scale.z) * smoothFactor;
 
         const targetRoll = Math.atan2(dy, dx);
         const targetYaw = (rightTemple.z - leftTemple.z) * 1.4;
