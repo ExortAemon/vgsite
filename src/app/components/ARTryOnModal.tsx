@@ -381,6 +381,18 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const faceAnchor = new THREE.Group();
         faceAnchor.position.set(0, 0, -2.4);
         faceAnchor.add(glasses);
+
+        // Occluder: hides parts of glasses (especially temples) that should be behind the head.
+        const occluderMaterial = new THREE.MeshBasicMaterial({
+          colorWrite: false,
+          depthWrite: true,
+          depthTest: true,
+          side: THREE.DoubleSide,
+        });
+        const faceOccluder = new THREE.Mesh(new THREE.SphereGeometry(0.72, 32, 24), occluderMaterial);
+        faceOccluder.position.set(0, -0.02, 0.18);
+        faceAnchor.add(faceOccluder);
+
         scene.add(faceAnchor);
 
         faceAnchorRef.current = faceAnchor;
@@ -450,13 +462,13 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const smoothFactor = 0.22;
-        const blendedFaceX = (noseBridge.x * 0.7) + (centerX * 0.3);
+        const smoothFactor = 0.32;
+        const blendedFaceX = (noseBridge.x * 0.8) + (centerX * 0.2);
         const mirroredNoseX = 1 - blendedFaceX;
         const yawAmount = rightTemple.z - leftTemple.z;
-        const anchorTargetX = ((mirroredNoseX - 0.5) * 4.1);
-        const anchorTargetY = (-(noseBridge.y - 0.5) * 3.05 - 0.33);
-        const anchorTargetZ = (-noseBridge.z * 7.6 - 2.2);
+        const anchorTargetX = ((mirroredNoseX - 0.5) * 4.55);
+        const anchorTargetY = (-(noseBridge.y - 0.5) * 3.35 - 0.36);
+        const anchorTargetZ = (-noseBridge.z * 8.1 - 2.1);
 
         if (faceAnchorRef.current) {
           faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * smoothFactor;
@@ -487,6 +499,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * smoothFactor;
         rotationTarget.rotation.y += (targetYaw - rotationTarget.rotation.y) * smoothFactor;
         rotationTarget.rotation.x += (targetPitch - rotationTarget.rotation.x) * smoothFactor;
+
+        // Keep occluder matched to face width/depth so temples get hidden correctly on yaw.
+        faceOccluder.scale.x += ((limitedTargetScale * 0.095) - faceOccluder.scale.x) * smoothFactor;
+        faceOccluder.scale.y += ((limitedTargetScale * 0.11) - faceOccluder.scale.y) * smoothFactor;
+        faceOccluder.scale.z += ((limitedTargetScale * 0.105) - faceOccluder.scale.z) * smoothFactor;
 
         });
 
