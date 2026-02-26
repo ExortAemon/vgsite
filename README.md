@@ -73,6 +73,7 @@ https://www.figma.com/design/DdDCtqW30NBfNZ6Vzi1eG0/vg
    ```bash
    npm run prepare:vendor
    ```
+   Эта команда также патчит `GLTFLoader.module.js` для локального импорта `/vendor/three.module.js`.
 3. Перезапустите dev-сервер:
    ```bash
    npm run dev

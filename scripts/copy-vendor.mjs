@@ -1,4 +1,4 @@
-import { mkdirSync, copyFileSync, existsSync } from 'node:fs';
+import { mkdirSync, copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,6 +9,10 @@ const files = [
   {
     src: resolve(root, 'node_modules/three/build/three.min.js'),
     dest: resolve(vendorDir, 'three.min.js'),
+  },
+  {
+    src: resolve(root, 'node_modules/three/build/three.module.js'),
+    dest: resolve(vendorDir, 'three.module.js'),
   },
   {
     src: resolve(root, 'node_modules/three/examples/js/loaders/GLTFLoader.js'),
@@ -32,6 +36,21 @@ for (const file of files) {
   copyFileSync(file.src, file.dest);
   copied += 1;
   console.log(`[vendor] copied: ${file.dest}`);
+}
+
+const gltfModulePath = resolve(vendorDir, 'GLTFLoader.module.js');
+const threeModuleVendorPath = '/vendor/three.module.js';
+
+if (existsSync(gltfModulePath)) {
+  const source = readFileSync(gltfModulePath, 'utf8');
+  const patched = source
+    .replaceAll('from "three"', `from "${threeModuleVendorPath}"`)
+    .replaceAll("from 'three'", `from '${threeModuleVendorPath}'`);
+
+  if (patched !== source) {
+    writeFileSync(gltfModulePath, patched, 'utf8');
+    console.log(`[vendor] patched imports in: ${gltfModulePath}`);
+  }
 }
 
 if (copied === 0) {

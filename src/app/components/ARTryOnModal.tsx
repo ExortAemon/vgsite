@@ -90,9 +90,9 @@ const loadGltfLoaderClass = async () => {
   }
 
   const moduleUrls = [
+    "/vendor/GLTFLoader.module.js",
     "https://esm.sh/three@0.153.0/examples/jsm/loaders/GLTFLoader.js?bundle",
     "https://ga.jspm.io/npm:three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
-    "/vendor/GLTFLoader.module.js",
     "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
     "https://unpkg.com/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
     "https://raw.githubusercontent.com/mrdoob/three.js/r153/examples/jsm/loaders/GLTFLoader.js",
