@@ -71,17 +71,55 @@ const loadScriptWithFallback = async (urls: string[]) => {
 };
 
 const loadGltfLoaderClass = async () => {
-  await loadScriptWithFallback([
+  const legacyScriptUrls = [
+    "/vendor/GLTFLoader.js",
+    "https://threejs.org/examples/js/loaders/GLTFLoader.js",
     "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js",
     "https://unpkg.com/three@0.153.0/examples/js/loaders/GLTFLoader.js",
     "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r153/examples/js/loaders/GLTFLoader.js",
-  ]);
+    "https://raw.githubusercontent.com/mrdoob/three.js/r153/examples/js/loaders/GLTFLoader.js",
+  ];
 
-  if (!window.THREE?.GLTFLoader) {
-    throw new Error("GLTF_LOADER_INCOMPATIBLE");
+  try {
+    await loadScriptWithFallback(legacyScriptUrls);
+    if (window.THREE?.GLTFLoader) {
+      return window.THREE.GLTFLoader;
+    }
+  } catch {
+    // try ESM fallbacks below
   }
 
-  return window.THREE.GLTFLoader;
+  const moduleUrls = [
+    "/vendor/GLTFLoader.module.js",
+    "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/loaders/GLTFLoader.js?module",
+    "https://esm.sh/three@0.153.0/examples/jsm/loaders/GLTFLoader.js?bundle",
+    "https://esm.run/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
+    "https://cdn.skypack.dev/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
+    "https://ga.jspm.io/npm:three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
+    "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
+    "https://unpkg.com/three@0.153.0/examples/jsm/loaders/GLTFLoader.js",
+    "https://raw.githubusercontent.com/mrdoob/three.js/r153/examples/jsm/loaders/GLTFLoader.js",
+  ];
+
+  let lastError: unknown;
+  for (const moduleUrl of moduleUrls) {
+    try {
+      const moduleExports = await withTimeout(
+        import(/* @vite-ignore */ moduleUrl),
+        9000,
+        `GLTF_MODULE_TIMEOUT:${moduleUrl}`,
+      );
+
+      const loaderClass = moduleExports?.GLTFLoader || moduleExports?.default;
+      if (loaderClass) {
+        return loaderClass;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("GLTF_LOADER_UNAVAILABLE");
 };
 
 export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl }: ARTryOnModalProps) {
@@ -235,6 +273,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
       try {
         await loadScriptWithFallback([
+          "/vendor/three.min.js",
+          "https://threejs.org/build/three.min.js",
           "https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js",
           "https://unpkg.com/three@0.153.0/build/three.min.js",
         ]);
@@ -331,15 +371,31 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           normalizeModel(glasses);
         } catch (error) {
           modelLoadErrorMessage = error instanceof Error ? error.message : "MODEL_LOAD_FAILED";
+          if (modelLoadErrorMessage.includes("GLTF_LOADER_UNAVAILABLE") || modelLoadErrorMessage.includes("GLTF_LOADER_INCOMPATIBLE") || modelLoadErrorMessage.includes("GLTF_MODULE_TIMEOUT")) {
+            throw new Error(modelLoadErrorMessage);
+          }
           throw new Error(`MODEL_LOAD_FAILED:${modelLoadErrorMessage}`);
         }
 
-        glasses.scale.setScalar(1.05);
-        glasses.position.set(0, -0.08, 0.04);
+        glasses.scale.setScalar(9.25);
+        glasses.position.set(0, -0.2, 0.06);
+        glasses.rotation.x = -0.08;
 
         const faceAnchor = new THREE.Group();
         faceAnchor.position.set(0, 0, -2.4);
         faceAnchor.add(glasses);
+
+        // Occluder: hides parts of glasses (especially temples) that should be behind the head.
+        const occluderMaterial = new THREE.MeshBasicMaterial({
+          colorWrite: false,
+          depthWrite: true,
+          depthTest: true,
+          side: THREE.DoubleSide,
+        });
+        const faceOccluder = new THREE.Mesh(new THREE.SphereGeometry(0.72, 32, 24), occluderMaterial);
+        faceOccluder.position.set(0, -0.02, 0.18);
+        faceAnchor.add(faceOccluder);
+
         scene.add(faceAnchor);
 
         faceAnchorRef.current = faceAnchor;
@@ -400,17 +456,22 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const nose = landmarks[1];
         const noseBridge = landmarks[6] || nose;
 
+        const leftEar = landmarks[127] || leftTemple;
+        const rightEar = landmarks[356] || rightTemple;
+
         const centerX = (leftEye.x + rightEye.x) / 2;
-        const centerY = (leftEye.y + rightEye.y) / 2;
 
         const dx = rightEye.x - leftEye.x;
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const smoothFactor = 0.22;
-        const anchorTargetX = ((centerX - 0.5) * 4.7);
-        const anchorTargetY = (-(centerY - 0.5) * 3.05 - 0.24);
-        const anchorTargetZ = (-noseBridge.z * 7.1 - 2.25);
+        const smoothFactor = 0.32;
+        const blendedFaceX = (noseBridge.x * 0.8) + (centerX * 0.2);
+        const mirroredNoseX = 1 - blendedFaceX;
+        const yawAmount = rightTemple.z - leftTemple.z;
+        const anchorTargetX = ((mirroredNoseX - 0.5) * 4.55);
+        const anchorTargetY = (-(noseBridge.y - 0.5) * 3.35 - 0.36);
+        const anchorTargetZ = (-noseBridge.z * 8.1 - 2.1);
 
         if (faceAnchorRef.current) {
           faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * smoothFactor;
@@ -418,20 +479,34 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           faceAnchorRef.current.position.z += (anchorTargetZ - faceAnchorRef.current.position.z) * smoothFactor;
         }
 
-        const faceWidth = Math.sqrt((rightTemple.x - leftTemple.x) ** 2 + (rightTemple.y - leftTemple.y) ** 2);
-        const targetScale = Math.max(eyeDistance * 6.5, faceWidth * 3.9);
-        modelRef.current.scale.x += (targetScale - modelRef.current.scale.x) * smoothFactor;
-        modelRef.current.scale.y += (targetScale - modelRef.current.scale.y) * smoothFactor;
-        modelRef.current.scale.z = modelRef.current.scale.x;
+        const templeDx = rightTemple.x - leftTemple.x;
+        const templeDy = rightTemple.y - leftTemple.y;
+        const templeDz = rightTemple.z - leftTemple.z;
+        const faceWidth = Math.sqrt((templeDx ** 2) + (templeDy ** 2) + (templeDz ** 2));
+        const earDx = rightEar.x - leftEar.x;
+        const earDy = rightEar.y - leftEar.y;
+        const earDz = rightEar.z - leftEar.z;
+        const earDistance = Math.sqrt((earDx ** 2) + (earDy ** 2) + (earDz ** 2));
+        const targetScale = Math.max(eyeDistance * 140, faceWidth * 82, earDistance * 82, 10.5);
+        const currentScale = modelRef.current.scale.x || targetScale;
+        const limitedTargetScale = THREE.MathUtils.clamp(targetScale, currentScale * 0.93, currentScale * 1.07);
+        modelRef.current.scale.x += (limitedTargetScale - modelRef.current.scale.x) * smoothFactor;
+        modelRef.current.scale.y += (limitedTargetScale - modelRef.current.scale.y) * smoothFactor;
+        modelRef.current.scale.z += (limitedTargetScale - modelRef.current.scale.z) * smoothFactor;
 
         const targetRoll = -Math.atan2(dy, dx);
-        const targetYaw = (leftTemple.z - rightTemple.z) * 2.6;
-        const targetPitch = (chin.y - forehead.y - 0.33) * 2.2;
+        const targetYaw = yawAmount * 1.15;
+        const targetPitch = -(chin.y - forehead.y - 0.33) * 1.6;
 
         const rotationTarget = faceAnchorRef.current || modelRef.current;
         rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * smoothFactor;
         rotationTarget.rotation.y += (targetYaw - rotationTarget.rotation.y) * smoothFactor;
         rotationTarget.rotation.x += (targetPitch - rotationTarget.rotation.x) * smoothFactor;
+
+        // Keep occluder matched to face width/depth so temples get hidden correctly on yaw.
+        faceOccluder.scale.x += ((limitedTargetScale * 0.095) - faceOccluder.scale.x) * smoothFactor;
+        faceOccluder.scale.y += ((limitedTargetScale * 0.11) - faceOccluder.scale.y) * smoothFactor;
+        faceOccluder.scale.z += ((limitedTargetScale * 0.105) - faceOccluder.scale.z) * smoothFactor;
 
         });
 
@@ -453,6 +528,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const reason = arError instanceof Error ? arError.message : "неизвестная ошибка";
         if (reason.includes("onBuild")) {
           setStatusMessage("AR не инициализирован: конфликт версий GLTFLoader/Three.js. Обновите страницу (Ctrl+F5) и попробуйте снова.");
+        } else if (reason.includes("GLTF_LOADER_UNAVAILABLE") || reason.includes("GLTF_LOADER_INCOMPATIBLE") || reason.includes("GLTF_MODULE_TIMEOUT")) {
+          setStatusMessage("Не удалось загрузить GLTFLoader. Проверьте локальные /vendor/three.min.js + /vendor/GLTFLoader.js (или .module.js), либо доступ к esm.sh/esm.run/skypack/jspm/jsDelivr/unpkg.");
         } else if (reason.includes("MODEL_LOAD_FAILED:")) {
           setStatusMessage(`Не удалось загрузить вашу 3D-модель (${reason.replace("MODEL_LOAD_FAILED:", "")}). Проверьте, что файл .glb корректный и доступен по URL.`);
         } else {
