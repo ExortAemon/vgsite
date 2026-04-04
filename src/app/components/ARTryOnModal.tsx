@@ -378,7 +378,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         }
 
         glasses.scale.setScalar(9.25);
-        glasses.position.set(0, -0.2, 0.06);
+        glasses.position.set(0, -0.08, 0.12);
         glasses.rotation.x = -0.08;
 
         const faceAnchor = new THREE.Group();
@@ -392,8 +392,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           depthTest: true,
           side: THREE.DoubleSide,
         });
-        const faceOccluder = new THREE.Mesh(new THREE.SphereGeometry(0.72, 32, 24), occluderMaterial);
-        faceOccluder.position.set(0, -0.02, 0.18);
+        const faceOccluder = new THREE.Mesh(new THREE.SphereGeometry(0.6, 32, 24), occluderMaterial);
+        faceOccluder.position.set(0, 0.02, -0.04);
         faceAnchor.add(faceOccluder);
 
         scene.add(faceAnchor);
@@ -503,9 +503,9 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         rotationTarget.rotation.x += (targetPitch - rotationTarget.rotation.x) * smoothFactor;
 
         // Keep occluder matched to face width/depth so temples get hidden correctly on yaw.
-        faceOccluder.scale.x += ((limitedTargetScale * 0.095) - faceOccluder.scale.x) * smoothFactor;
-        faceOccluder.scale.y += ((limitedTargetScale * 0.11) - faceOccluder.scale.y) * smoothFactor;
-        faceOccluder.scale.z += ((limitedTargetScale * 0.105) - faceOccluder.scale.z) * smoothFactor;
+        faceOccluder.scale.x += ((limitedTargetScale * 0.07) - faceOccluder.scale.x) * smoothFactor;
+        faceOccluder.scale.y += ((limitedTargetScale * 0.085) - faceOccluder.scale.y) * smoothFactor;
+        faceOccluder.scale.z += ((limitedTargetScale * 0.08) - faceOccluder.scale.z) * smoothFactor;
 
         });
 
