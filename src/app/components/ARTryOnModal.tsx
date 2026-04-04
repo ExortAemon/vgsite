@@ -131,6 +131,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   const faceMeshRef = useRef<any>(null);
   const modelRef = useRef<any>(null);
   const faceAnchorRef = useRef<any>(null);
+  const templeOccludersRef = useRef<{ left: any; right: any } | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const resizeHandlerRef = useRef<(() => void) | null>(null);
   const faceDetectedRef = useRef(false);
@@ -194,6 +195,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
     modelRef.current = null;
     faceAnchorRef.current = null;
+    templeOccludersRef.current = null;
     faceDetectedRef.current = false;
     trackingConfirmedRef.current = false;
     setCameraEnabled(false);
@@ -402,7 +404,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           throw new Error(`MODEL_LOAD_FAILED:${modelLoadErrorMessage}`);
         }
 
-        glasses.scale.setScalar(9.25);
+        glasses.scale.setScalar(8.35);
         glasses.position.set(0, -0.1, 0.04);
         glasses.rotation.x = -0.08;
 
@@ -417,12 +419,13 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           depthTest: true,
           side: THREE.DoubleSide,
         });
-        const leftTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.28, 0.52), occluderMaterial);
-        const rightTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.28, 0.52), occluderMaterial);
-        leftTempleOccluder.position.set(-0.74, -0.01, -0.12);
-        rightTempleOccluder.position.set(0.74, -0.01, -0.12);
+        const leftTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.3, 0.9), occluderMaterial);
+        const rightTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.3, 0.9), occluderMaterial);
+        leftTempleOccluder.position.set(-0.78, -0.015, -0.22);
+        rightTempleOccluder.position.set(0.78, -0.015, -0.22);
         glasses.add(leftTempleOccluder);
         glasses.add(rightTempleOccluder);
+        templeOccludersRef.current = { left: leftTempleOccluder, right: rightTempleOccluder };
 
         scene.add(faceAnchor);
 
@@ -496,7 +499,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
         const positionSmoothFactor = 0.46;
-        const rotationSmoothFactor = 0.28;
+        const rotationSmoothFactor = 0.4;
         const blendedFaceX = (noseBridge.x * 0.82) + (eyeCenterX * 0.18);
         const yawAmount = rightTemple.z - leftTemple.z;
         const anchorTargetZ = THREE.MathUtils.clamp((-2.15 - (0.115 - eyeDistance) * 8.2), -3.2, -1.45);
@@ -521,7 +524,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const earDy = rightEar.y - leftEar.y;
         const earDz = rightEar.z - leftEar.z;
         const earDistance = Math.sqrt((earDx ** 2) + (earDy ** 2) + (earDz ** 2));
-        const targetScale = Math.max(eyeDistance * 122, templeDistance * 69, earDistance * 66, 10.6);
+        const targetScale = Math.max(eyeDistance * 114, templeDistance * 64, earDistance * 62, 9.8);
         const currentScale = modelRef.current.scale.x || targetScale;
         const limitedTargetScale = THREE.MathUtils.clamp(targetScale, currentScale * 0.96, currentScale * 1.04);
         modelRef.current.scale.x += (limitedTargetScale - modelRef.current.scale.x) * positionSmoothFactor;
@@ -538,6 +541,16 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
         // Keep pitch in a sane range to avoid extreme flips on noisy frames.
         rotationTarget.rotation.x = THREE.MathUtils.clamp(rotationTarget.rotation.x, -0.95, 0.95);
+
+        const yawNormalized = THREE.MathUtils.clamp(targetYaw / 1.18, -1, 1);
+        const occluders = templeOccludersRef.current;
+        if (occluders) {
+          const leftIsFar = yawNormalized > 0;
+          const farScale = 1 + Math.abs(yawNormalized) * 1.1;
+          const nearScale = 0.72;
+          occluders.left.scale.z += (((leftIsFar ? farScale : nearScale)) - occluders.left.scale.z) * positionSmoothFactor;
+          occluders.right.scale.z += (((leftIsFar ? nearScale : farScale)) - occluders.right.scale.z) * positionSmoothFactor;
+        }
 
         });
 
