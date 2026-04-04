@@ -474,7 +474,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
         const smoothFactor = 0.32;
         const blendedFaceX = (noseBridge.x * 0.6) + (eyeCenterX * 0.4);
-        const yawAmount = leftEye.z - rightEye.z;
+        const yawAmount = rightEye.z - leftEye.z;
         const anchorTargetX = ((blendedFaceX - 0.5) * 4.15) + (yawAmount * 0.65);
         const anchorTargetY = (-((eyeCenterY * 0.7 + noseBridge.y * 0.3) - 0.5) * 3.05 - 0.24);
         const anchorTargetZ = THREE.MathUtils.clamp((-eyeCenterZ * 8.6 - 2.45), -3.25, -1.55);
