@@ -500,33 +500,32 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
         const leftEar = landmarks[127] || leftTemple;
         const rightEar = landmarks[356] || rightTemple;
-        const templeMidX = (leftTemple.x + rightTemple.x) / 2;
 
         const eyeCenterX = (leftInnerEye.x + rightInnerEye.x) / 2;
         const eyeCenterY = (leftInnerEye.y + rightInnerEye.y) / 2;
         const eyeCenterZ = (leftInnerEye.z + rightInnerEye.z) / 2;
+        const templeMidX = (leftTemple.x + rightTemple.x) / 2;
+        const templeMidY = (leftTemple.y + rightTemple.y) / 2;
+        const faceCenterX = (noseBridge.x * 0.4) + (eyeCenterX * 0.35) + (templeMidX * 0.25);
+        const faceCenterY = (noseBridge.y * 0.45) + (eyeCenterY * 0.35) + (templeMidY * 0.2);
 
         const dx = rightEye.x - leftEye.x;
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const positionSmoothFactor = 0.46;
-        const rotationSmoothFactor = 0.58;
-        const blendedFaceX = (noseBridge.x * 0.68) + (eyeCenterX * 0.2) + (templeMidX * 0.12);
+        const positionSmoothFactor = 0.54;
+        const rotationSmoothFactor = 0.5;
+        const blendedFaceX = faceCenterX;
         const yawAmount = rightTemple.z - leftTemple.z;
         const anchorTargetZ = THREE.MathUtils.clamp((-2.15 - (0.115 - eyeDistance) * 8.2), -3.2, -1.45);
         const depthFromCamera = camera.position.z - anchorTargetZ;
         const halfHeightAtDepth = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * depthFromCamera;
         const halfWidthAtDepth = halfHeightAtDepth * camera.aspect;
-        const rawYaw = THREE.MathUtils.clamp(yawAmount * 18, -1.18, 1.18);
-        const yawDeadzone = 0.12;
-        const yawAfterDeadzone = Math.abs(rawYaw) < yawDeadzone
-          ? 0
-          : Math.sign(rawYaw) * (Math.abs(rawYaw) - yawDeadzone);
-        yawFilteredRef.current += (yawAfterDeadzone - yawFilteredRef.current) * 0.34;
+        const rawYaw = THREE.MathUtils.clamp(Math.atan2(yawAmount, Math.max(0.01, rightTemple.x - leftTemple.x)) * 2.6, -1.18, 1.18);
+        yawFilteredRef.current += (rawYaw - yawFilteredRef.current) * 0.42;
         const targetYaw = yawFilteredRef.current;
-        const anchorTargetX = ((blendedFaceX - 0.5) * 2 * halfWidthAtDepth) + (targetYaw * 0.08);
-        const anchorTargetY = ((0.5 - noseBridge.y) * 2 * halfHeightAtDepth) - 0.34;
+        const anchorTargetX = ((blendedFaceX - 0.5) * 2 * halfWidthAtDepth) + (targetYaw * 0.03);
+        const anchorTargetY = ((0.5 - faceCenterY) * 2 * halfHeightAtDepth) - 0.34;
 
         if (faceAnchorRef.current) {
           faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * positionSmoothFactor;
@@ -550,9 +549,9 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         modelRef.current.scale.z += (limitedTargetScale - modelRef.current.scale.z) * positionSmoothFactor;
 
         const targetRoll = THREE.MathUtils.clamp(-Math.atan2(dy, dx), -1.2, 1.2);
-        const targetPitchFromNose = ((noseBridge.y - eyeCenterY) - 0.038) * -7.6;
-        const targetPitchFromFaceHeight = (chin.y - forehead.y - 0.34) * 2.2;
-        const targetPitch = THREE.MathUtils.clamp((targetPitchFromNose * 0.72) + (targetPitchFromFaceHeight * 0.28), -0.95, 0.95);
+        const targetPitchFromNose = ((noseBridge.y - eyeCenterY) - 0.038) * -6.8;
+        const targetPitchFromFaceHeight = (chin.y - forehead.y - 0.34) * 2.6;
+        const targetPitch = THREE.MathUtils.clamp((targetPitchFromNose * 0.58) + (targetPitchFromFaceHeight * 0.42), -0.95, 0.95);
 
         const rotationTarget = faceAnchorRef.current || modelRef.current;
         rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * rotationSmoothFactor;
