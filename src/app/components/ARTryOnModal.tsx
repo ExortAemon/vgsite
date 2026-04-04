@@ -132,6 +132,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   const modelRef = useRef<any>(null);
   const faceAnchorRef = useRef<any>(null);
   const templeOccludersRef = useRef<{ left: any; right: any } | null>(null);
+  const yawFilteredRef = useRef(0);
   const animationFrameRef = useRef<number | null>(null);
   const resizeHandlerRef = useRef<(() => void) | null>(null);
   const faceDetectedRef = useRef(false);
@@ -196,6 +197,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
     modelRef.current = null;
     faceAnchorRef.current = null;
     templeOccludersRef.current = null;
+    yawFilteredRef.current = 0;
     faceDetectedRef.current = false;
     trackingConfirmedRef.current = false;
     setCameraEnabled(false);
@@ -404,7 +406,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           throw new Error(`MODEL_LOAD_FAILED:${modelLoadErrorMessage}`);
         }
 
-        glasses.scale.setScalar(8.35);
+        glasses.scale.setScalar(6.68);
         glasses.position.set(0, -0.1, 0.04);
         glasses.rotation.x = -0.08;
 
@@ -506,8 +508,14 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const depthFromCamera = camera.position.z - anchorTargetZ;
         const halfHeightAtDepth = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * depthFromCamera;
         const halfWidthAtDepth = halfHeightAtDepth * camera.aspect;
-        const targetYaw = THREE.MathUtils.clamp(yawAmount * 18, -1.18, 1.18);
-        const anchorTargetX = ((blendedFaceX - 0.5) * 2 * halfWidthAtDepth) + (targetYaw * 0.22);
+        const rawYaw = THREE.MathUtils.clamp(yawAmount * 18, -1.18, 1.18);
+        const yawDeadzone = 0.12;
+        const yawAfterDeadzone = Math.abs(rawYaw) < yawDeadzone
+          ? 0
+          : Math.sign(rawYaw) * (Math.abs(rawYaw) - yawDeadzone);
+        yawFilteredRef.current += (yawAfterDeadzone - yawFilteredRef.current) * 0.22;
+        const targetYaw = yawFilteredRef.current;
+        const anchorTargetX = ((blendedFaceX - 0.5) * 2 * halfWidthAtDepth) + (targetYaw * 0.08);
         const anchorTargetY = ((0.5 - noseBridge.y) * 2 * halfHeightAtDepth) - 0.34;
 
         if (faceAnchorRef.current) {
@@ -524,7 +532,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const earDy = rightEar.y - leftEar.y;
         const earDz = rightEar.z - leftEar.z;
         const earDistance = Math.sqrt((earDx ** 2) + (earDy ** 2) + (earDz ** 2));
-        const targetScale = Math.max(eyeDistance * 114, templeDistance * 64, earDistance * 62, 9.8);
+        const targetScale = Math.max(eyeDistance * 91.2, templeDistance * 51.2, earDistance * 49.6, 7.84);
         const currentScale = modelRef.current.scale.x || targetScale;
         const limitedTargetScale = THREE.MathUtils.clamp(targetScale, currentScale * 0.96, currentScale * 1.04);
         modelRef.current.scale.x += (limitedTargetScale - modelRef.current.scale.x) * positionSmoothFactor;
