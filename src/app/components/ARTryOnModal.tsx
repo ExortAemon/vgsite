@@ -423,10 +423,17 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         });
         const leftTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.3, 0.9), occluderMaterial);
         const rightTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.3, 0.9), occluderMaterial);
-        leftTempleOccluder.position.set(-0.78, -0.015, -0.22);
-        rightTempleOccluder.position.set(0.78, -0.015, -0.22);
+        leftTempleOccluder.position.set(-0.76, -0.01, -0.12);
+        rightTempleOccluder.position.set(0.76, -0.01, -0.12);
+        leftTempleOccluder.renderOrder = 0;
+        rightTempleOccluder.renderOrder = 0;
         glasses.add(leftTempleOccluder);
         glasses.add(rightTempleOccluder);
+        glasses.traverse((child: any) => {
+          if (child?.isMesh && child !== leftTempleOccluder && child !== rightTempleOccluder) {
+            child.renderOrder = 1;
+          }
+        });
         templeOccludersRef.current = { left: leftTempleOccluder, right: rightTempleOccluder };
 
         scene.add(faceAnchor);
@@ -491,6 +498,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
         const leftEar = landmarks[127] || leftTemple;
         const rightEar = landmarks[356] || rightTemple;
+        const templeMidX = (leftTemple.x + rightTemple.x) / 2;
 
         const eyeCenterX = (leftInnerEye.x + rightInnerEye.x) / 2;
         const eyeCenterY = (leftInnerEye.y + rightInnerEye.y) / 2;
@@ -501,8 +509,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
         const positionSmoothFactor = 0.46;
-        const rotationSmoothFactor = 0.4;
-        const blendedFaceX = (noseBridge.x * 0.82) + (eyeCenterX * 0.18);
+        const rotationSmoothFactor = 0.46;
+        const blendedFaceX = (noseBridge.x * 0.68) + (eyeCenterX * 0.2) + (templeMidX * 0.12);
         const yawAmount = rightTemple.z - leftTemple.z;
         const anchorTargetZ = THREE.MathUtils.clamp((-2.15 - (0.115 - eyeDistance) * 8.2), -3.2, -1.45);
         const depthFromCamera = camera.position.z - anchorTargetZ;
@@ -553,9 +561,9 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const yawNormalized = THREE.MathUtils.clamp(targetYaw / 1.18, -1, 1);
         const occluders = templeOccludersRef.current;
         if (occluders) {
-          const leftIsFar = yawNormalized > 0;
-          const farScale = 1 + Math.abs(yawNormalized) * 1.1;
-          const nearScale = 0.72;
+          const leftIsFar = leftTemple.z > rightTemple.z;
+          const farScale = 1 + Math.abs(yawNormalized) * 1.8;
+          const nearScale = 0.55;
           occluders.left.scale.z += (((leftIsFar ? farScale : nearScale)) - occluders.left.scale.z) * positionSmoothFactor;
           occluders.right.scale.z += (((leftIsFar ? nearScale : farScale)) - occluders.right.scale.z) * positionSmoothFactor;
         }
