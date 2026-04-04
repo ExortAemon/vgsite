@@ -132,6 +132,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   const modelRef = useRef<any>(null);
   const faceAnchorRef = useRef<any>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const resizeHandlerRef = useRef<(() => void) | null>(null);
   const faceDetectedRef = useRef(false);
   const noFaceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trackingConfirmedRef = useRef(false);
@@ -175,6 +176,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
     if (animationFrameRef.current !== null) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
+    }
+
+    if (resizeHandlerRef.current) {
+      window.removeEventListener("resize", resizeHandlerRef.current);
+      resizeHandlerRef.current = null;
     }
 
     if (noFaceTimerRef.current) {
@@ -299,7 +305,10 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         }
 
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 1000);
+        const viewportAspect = sceneHost.clientWidth > 0 && sceneHost.clientHeight > 0
+          ? sceneHost.clientWidth / sceneHost.clientHeight
+          : 16 / 9;
+        const camera = new THREE.PerspectiveCamera(45, viewportAspect, 0.1, 1000);
         camera.position.z = 6;
 
         const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -307,6 +316,22 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         renderer.setSize(sceneHost.clientWidth, sceneHost.clientHeight);
         sceneHost.appendChild(renderer.domElement);
         rendererRef.current = renderer;
+
+        const handleResize = () => {
+          if (!rendererRef.current || !sceneHostRef.current) {
+            return;
+          }
+          const width = sceneHostRef.current.clientWidth;
+          const height = sceneHostRef.current.clientHeight;
+          if (!width || !height) {
+            return;
+          }
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
+          rendererRef.current.setSize(width, height);
+        };
+        resizeHandlerRef.current = handleResize;
+        window.addEventListener("resize", handleResize);
 
         scene.add(new THREE.AmbientLight(0xffffff, 1.1));
         const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -472,12 +497,15 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const smoothFactor = 0.42;
+        const smoothFactor = 0.46;
         const blendedFaceX = (noseBridge.x * 0.82) + (eyeCenterX * 0.18);
         const yawAmount = rightEye.z - leftEye.z;
-        const anchorTargetX = ((blendedFaceX - 0.5) * 4.4);
-        const anchorTargetY = (-(noseBridge.y - 0.5) * 3.2 - 0.24);
         const anchorTargetZ = THREE.MathUtils.clamp((-2.15 - (0.115 - eyeDistance) * 8.2), -3.2, -1.45);
+        const depthFromCamera = camera.position.z - anchorTargetZ;
+        const halfHeightAtDepth = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * depthFromCamera;
+        const halfWidthAtDepth = halfHeightAtDepth * camera.aspect;
+        const anchorTargetX = ((blendedFaceX - 0.5) * 2 * halfWidthAtDepth);
+        const anchorTargetY = ((0.5 - noseBridge.y) * 2 * halfHeightAtDepth) - 0.18;
 
         if (faceAnchorRef.current) {
           faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * smoothFactor;
