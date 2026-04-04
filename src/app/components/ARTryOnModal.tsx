@@ -421,10 +421,10 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           depthTest: true,
           side: THREE.DoubleSide,
         });
-        const leftTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.3, 0.9), occluderMaterial);
-        const rightTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.3, 0.9), occluderMaterial);
-        leftTempleOccluder.position.set(-0.76, -0.01, -0.12);
-        rightTempleOccluder.position.set(0.76, -0.01, -0.12);
+        const leftTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.44, 1.35), occluderMaterial);
+        const rightTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.44, 1.35), occluderMaterial);
+        leftTempleOccluder.position.set(-0.96, -0.01, -0.1);
+        rightTempleOccluder.position.set(0.96, -0.01, -0.1);
         leftTempleOccluder.renderOrder = 0;
         rightTempleOccluder.renderOrder = 0;
         glasses.add(leftTempleOccluder);
@@ -493,6 +493,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const rightInnerEye = landmarks[362] || rightEye;
         const leftTemple = landmarks[234];
         const rightTemple = landmarks[454];
+        const forehead = landmarks[10];
+        const chin = landmarks[152];
         const nose = landmarks[1];
         const noseBridge = landmarks[6] || nose;
 
@@ -509,7 +511,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
         const positionSmoothFactor = 0.46;
-        const rotationSmoothFactor = 0.46;
+        const rotationSmoothFactor = 0.58;
         const blendedFaceX = (noseBridge.x * 0.68) + (eyeCenterX * 0.2) + (templeMidX * 0.12);
         const yawAmount = rightTemple.z - leftTemple.z;
         const anchorTargetZ = THREE.MathUtils.clamp((-2.15 - (0.115 - eyeDistance) * 8.2), -3.2, -1.45);
@@ -521,7 +523,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const yawAfterDeadzone = Math.abs(rawYaw) < yawDeadzone
           ? 0
           : Math.sign(rawYaw) * (Math.abs(rawYaw) - yawDeadzone);
-        yawFilteredRef.current += (yawAfterDeadzone - yawFilteredRef.current) * 0.22;
+        yawFilteredRef.current += (yawAfterDeadzone - yawFilteredRef.current) * 0.34;
         const targetYaw = yawFilteredRef.current;
         const anchorTargetX = ((blendedFaceX - 0.5) * 2 * halfWidthAtDepth) + (targetYaw * 0.08);
         const anchorTargetY = ((0.5 - noseBridge.y) * 2 * halfHeightAtDepth) - 0.34;
@@ -548,7 +550,9 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         modelRef.current.scale.z += (limitedTargetScale - modelRef.current.scale.z) * positionSmoothFactor;
 
         const targetRoll = THREE.MathUtils.clamp(-Math.atan2(dy, dx), -1.2, 1.2);
-        const targetPitch = THREE.MathUtils.clamp(((noseBridge.y - eyeCenterY) - 0.038) * -8.1, -0.92, 0.92);
+        const targetPitchFromNose = ((noseBridge.y - eyeCenterY) - 0.038) * -7.6;
+        const targetPitchFromFaceHeight = (chin.y - forehead.y - 0.34) * 2.2;
+        const targetPitch = THREE.MathUtils.clamp((targetPitchFromNose * 0.72) + (targetPitchFromFaceHeight * 0.28), -0.95, 0.95);
 
         const rotationTarget = faceAnchorRef.current || modelRef.current;
         rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * rotationSmoothFactor;
@@ -562,10 +566,24 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const occluders = templeOccludersRef.current;
         if (occluders) {
           const leftIsFar = leftTemple.z > rightTemple.z;
-          const farScale = 1 + Math.abs(yawNormalized) * 1.8;
-          const nearScale = 0.55;
-          occluders.left.scale.z += (((leftIsFar ? farScale : nearScale)) - occluders.left.scale.z) * positionSmoothFactor;
-          occluders.right.scale.z += (((leftIsFar ? nearScale : farScale)) - occluders.right.scale.z) * positionSmoothFactor;
+          const farScale = 1.15 + Math.abs(yawNormalized) * 2.2;
+          const nearScale = 0.22;
+          const farXOffset = 1.02;
+          const nearXOffset = 0.78;
+
+          const leftTargetScale = leftIsFar ? farScale : nearScale;
+          const rightTargetScale = leftIsFar ? nearScale : farScale;
+          const leftTargetX = leftIsFar ? -farXOffset : -nearXOffset;
+          const rightTargetX = leftIsFar ? nearXOffset : farXOffset;
+
+          occluders.left.position.x += (leftTargetX - occluders.left.position.x) * positionSmoothFactor;
+          occluders.right.position.x += (rightTargetX - occluders.right.position.x) * positionSmoothFactor;
+          occluders.left.scale.x += ((leftTargetScale * 0.85) - occluders.left.scale.x) * positionSmoothFactor;
+          occluders.right.scale.x += ((rightTargetScale * 0.85) - occluders.right.scale.x) * positionSmoothFactor;
+          occluders.left.scale.y += ((leftTargetScale * 0.9) - occluders.left.scale.y) * positionSmoothFactor;
+          occluders.right.scale.y += ((rightTargetScale * 0.9) - occluders.right.scale.y) * positionSmoothFactor;
+          occluders.left.scale.z += ((leftTargetScale) - occluders.left.scale.z) * positionSmoothFactor;
+          occluders.right.scale.z += ((rightTargetScale) - occluders.right.scale.z) * positionSmoothFactor;
         }
 
         });
