@@ -565,11 +565,14 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const yawNormalized = THREE.MathUtils.clamp(targetYaw / 1.18, -1, 1);
         const occluders = templeOccludersRef.current;
         if (occluders) {
-          const leftIsFar = leftTemple.z > rightTemple.z;
-          const farScale = 1.15 + Math.abs(yawNormalized) * 2.2;
-          const nearScale = 0.22;
-          const farXOffset = 1.02;
-          const nearXOffset = 0.78;
+          // In mirrored selfie mode, geometric z-comparison can be inverted visually.
+          // Use filtered yaw sign for stable far-side detection in head turns.
+          const leftIsFar = yawNormalized < 0;
+          const turnAmount = Math.abs(yawNormalized);
+          const farScale = 0.8 + turnAmount * 3.2;
+          const nearScale = turnAmount > 0.12 ? 0.02 : 0.12;
+          const farXOffset = 1.08;
+          const nearXOffset = 0.66;
 
           const leftTargetScale = leftIsFar ? farScale : nearScale;
           const rightTargetScale = leftIsFar ? nearScale : farScale;
