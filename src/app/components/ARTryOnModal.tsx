@@ -403,7 +403,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         }
 
         glasses.scale.setScalar(9.25);
-        glasses.position.set(0, -0.02, 0.06);
+        glasses.position.set(0, -0.1, 0.04);
         glasses.rotation.x = -0.08;
 
         const faceAnchor = new THREE.Group();
@@ -481,8 +481,6 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const rightInnerEye = landmarks[362] || rightEye;
         const leftTemple = landmarks[234];
         const rightTemple = landmarks[454];
-        const forehead = landmarks[10];
-        const chin = landmarks[152];
         const nose = landmarks[1];
         const noseBridge = landmarks[6] || nose;
 
@@ -497,20 +495,22 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const smoothFactor = 0.46;
+        const positionSmoothFactor = 0.46;
+        const rotationSmoothFactor = 0.28;
         const blendedFaceX = (noseBridge.x * 0.82) + (eyeCenterX * 0.18);
-        const yawAmount = rightEye.z - leftEye.z;
+        const yawAmount = rightTemple.z - leftTemple.z;
         const anchorTargetZ = THREE.MathUtils.clamp((-2.15 - (0.115 - eyeDistance) * 8.2), -3.2, -1.45);
         const depthFromCamera = camera.position.z - anchorTargetZ;
         const halfHeightAtDepth = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * depthFromCamera;
         const halfWidthAtDepth = halfHeightAtDepth * camera.aspect;
-        const anchorTargetX = ((blendedFaceX - 0.5) * 2 * halfWidthAtDepth);
-        const anchorTargetY = ((0.5 - noseBridge.y) * 2 * halfHeightAtDepth) - 0.18;
+        const targetYaw = THREE.MathUtils.clamp(yawAmount * 18, -1.18, 1.18);
+        const anchorTargetX = ((blendedFaceX - 0.5) * 2 * halfWidthAtDepth) + (targetYaw * 0.22);
+        const anchorTargetY = ((0.5 - noseBridge.y) * 2 * halfHeightAtDepth) - 0.34;
 
         if (faceAnchorRef.current) {
-          faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * smoothFactor;
-          faceAnchorRef.current.position.y += (anchorTargetY - faceAnchorRef.current.position.y) * smoothFactor;
-          faceAnchorRef.current.position.z += (anchorTargetZ - faceAnchorRef.current.position.z) * smoothFactor;
+          faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * positionSmoothFactor;
+          faceAnchorRef.current.position.y += (anchorTargetY - faceAnchorRef.current.position.y) * positionSmoothFactor;
+          faceAnchorRef.current.position.z += (anchorTargetZ - faceAnchorRef.current.position.z) * positionSmoothFactor;
         }
 
         const templeDx = rightTemple.x - leftTemple.x;
@@ -524,18 +524,17 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const targetScale = Math.max(eyeDistance * 122, templeDistance * 69, earDistance * 66, 10.6);
         const currentScale = modelRef.current.scale.x || targetScale;
         const limitedTargetScale = THREE.MathUtils.clamp(targetScale, currentScale * 0.96, currentScale * 1.04);
-        modelRef.current.scale.x += (limitedTargetScale - modelRef.current.scale.x) * smoothFactor;
-        modelRef.current.scale.y += (limitedTargetScale - modelRef.current.scale.y) * smoothFactor;
-        modelRef.current.scale.z += (limitedTargetScale - modelRef.current.scale.z) * smoothFactor;
+        modelRef.current.scale.x += (limitedTargetScale - modelRef.current.scale.x) * positionSmoothFactor;
+        modelRef.current.scale.y += (limitedTargetScale - modelRef.current.scale.y) * positionSmoothFactor;
+        modelRef.current.scale.z += (limitedTargetScale - modelRef.current.scale.z) * positionSmoothFactor;
 
-        const targetRoll = -Math.atan2(dy, dx);
-        const targetYaw = yawAmount * 12.5;
-        const targetPitch = -(((noseBridge.y - eyeCenterY) - 0.04) * 8.6) + ((chin.y - forehead.y - 0.33) * 1.2);
+        const targetRoll = THREE.MathUtils.clamp(-Math.atan2(dy, dx), -1.2, 1.2);
+        const targetPitch = THREE.MathUtils.clamp(((noseBridge.y - eyeCenterY) - 0.038) * -8.1, -0.92, 0.92);
 
         const rotationTarget = faceAnchorRef.current || modelRef.current;
-        rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * smoothFactor;
-        rotationTarget.rotation.y += (targetYaw - rotationTarget.rotation.y) * smoothFactor;
-        rotationTarget.rotation.x += (targetPitch - rotationTarget.rotation.x) * smoothFactor;
+        rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * rotationSmoothFactor;
+        rotationTarget.rotation.y += (targetYaw - rotationTarget.rotation.y) * rotationSmoothFactor;
+        rotationTarget.rotation.x += (targetPitch - rotationTarget.rotation.x) * rotationSmoothFactor;
 
         // Keep pitch in a sane range to avoid extreme flips on noisy frames.
         rotationTarget.rotation.x = THREE.MathUtils.clamp(rotationTarget.rotation.x, -0.95, 0.95);
