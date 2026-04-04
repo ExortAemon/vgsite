@@ -131,7 +131,10 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
   const faceMeshRef = useRef<any>(null);
   const modelRef = useRef<any>(null);
   const faceAnchorRef = useRef<any>(null);
+  const templeOccludersRef = useRef<{ left: any; right: any } | null>(null);
+  const yawFilteredRef = useRef(0);
   const animationFrameRef = useRef<number | null>(null);
+  const resizeHandlerRef = useRef<(() => void) | null>(null);
   const faceDetectedRef = useRef(false);
   const noFaceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trackingConfirmedRef = useRef(false);
@@ -177,6 +180,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
       animationFrameRef.current = null;
     }
 
+    if (resizeHandlerRef.current) {
+      window.removeEventListener("resize", resizeHandlerRef.current);
+      resizeHandlerRef.current = null;
+    }
+
     if (noFaceTimerRef.current) {
       clearTimeout(noFaceTimerRef.current);
       noFaceTimerRef.current = null;
@@ -188,6 +196,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
     modelRef.current = null;
     faceAnchorRef.current = null;
+    templeOccludersRef.current = null;
+    yawFilteredRef.current = 0;
     faceDetectedRef.current = false;
     trackingConfirmedRef.current = false;
     setCameraEnabled(false);
@@ -299,7 +309,10 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         }
 
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 1000);
+        const viewportAspect = sceneHost.clientWidth > 0 && sceneHost.clientHeight > 0
+          ? sceneHost.clientWidth / sceneHost.clientHeight
+          : 16 / 9;
+        const camera = new THREE.PerspectiveCamera(45, viewportAspect, 0.1, 1000);
         camera.position.z = 6;
 
         const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -307,6 +320,22 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         renderer.setSize(sceneHost.clientWidth, sceneHost.clientHeight);
         sceneHost.appendChild(renderer.domElement);
         rendererRef.current = renderer;
+
+        const handleResize = () => {
+          if (!rendererRef.current || !sceneHostRef.current) {
+            return;
+          }
+          const width = sceneHostRef.current.clientWidth;
+          const height = sceneHostRef.current.clientHeight;
+          if (!width || !height) {
+            return;
+          }
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
+          rendererRef.current.setSize(width, height);
+        };
+        resizeHandlerRef.current = handleResize;
+        window.addEventListener("resize", handleResize);
 
         scene.add(new THREE.AmbientLight(0xffffff, 1.1));
         const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -377,24 +406,35 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           throw new Error(`MODEL_LOAD_FAILED:${modelLoadErrorMessage}`);
         }
 
-        glasses.scale.setScalar(9.25);
-        glasses.position.set(0, -0.2, 0.06);
+        glasses.scale.setScalar(6.68);
+        glasses.position.set(0, -0.1, 0.04);
         glasses.rotation.x = -0.08;
 
         const faceAnchor = new THREE.Group();
         faceAnchor.position.set(0, 0, -2.4);
         faceAnchor.add(glasses);
 
-        // Occluder: hides parts of glasses (especially temples) that should be behind the head.
+        // Occluders: hide only the side arms of the glasses behind the head without masking lenses.
         const occluderMaterial = new THREE.MeshBasicMaterial({
           colorWrite: false,
           depthWrite: true,
           depthTest: true,
           side: THREE.DoubleSide,
         });
-        const faceOccluder = new THREE.Mesh(new THREE.SphereGeometry(0.72, 32, 24), occluderMaterial);
-        faceOccluder.position.set(0, -0.02, 0.18);
-        faceAnchor.add(faceOccluder);
+        const leftTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.44, 1.35), occluderMaterial);
+        const rightTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.44, 1.35), occluderMaterial);
+        leftTempleOccluder.position.set(-0.96, -0.01, -0.1);
+        rightTempleOccluder.position.set(0.96, -0.01, -0.1);
+        leftTempleOccluder.renderOrder = 0;
+        rightTempleOccluder.renderOrder = 0;
+        glasses.add(leftTempleOccluder);
+        glasses.add(rightTempleOccluder);
+        glasses.traverse((child: any) => {
+          if (child?.isMesh && child !== leftTempleOccluder && child !== rightTempleOccluder) {
+            child.renderOrder = 1;
+          }
+        });
+        templeOccludersRef.current = { left: leftTempleOccluder, right: rightTempleOccluder };
 
         scene.add(faceAnchor);
 
@@ -447,8 +487,10 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           }
 
         const landmarks = results.multiFaceLandmarks[0];
-        const leftEye = landmarks[468] || landmarks[33];
-        const rightEye = landmarks[473] || landmarks[263];
+        const leftEye = landmarks[33];
+        const rightEye = landmarks[263];
+        const leftInnerEye = landmarks[133] || leftEye;
+        const rightInnerEye = landmarks[362] || rightEye;
         const leftTemple = landmarks[234];
         const rightTemple = landmarks[454];
         const forehead = landmarks[10];
@@ -458,55 +500,96 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
         const leftEar = landmarks[127] || leftTemple;
         const rightEar = landmarks[356] || rightTemple;
+        const templeMidX = (leftTemple.x + rightTemple.x) / 2;
 
-        const centerX = (leftEye.x + rightEye.x) / 2;
+        const eyeCenterX = (leftInnerEye.x + rightInnerEye.x) / 2;
+        const eyeCenterY = (leftInnerEye.y + rightInnerEye.y) / 2;
+        const eyeCenterZ = (leftInnerEye.z + rightInnerEye.z) / 2;
 
         const dx = rightEye.x - leftEye.x;
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const smoothFactor = 0.32;
-        const blendedFaceX = (noseBridge.x * 0.8) + (centerX * 0.2);
-        const mirroredNoseX = 1 - blendedFaceX;
-        const yawAmount = rightTemple.z - leftTemple.z;
-        const anchorTargetX = ((mirroredNoseX - 0.5) * 4.55);
-        const anchorTargetY = (-(noseBridge.y - 0.5) * 3.35 - 0.36);
-        const anchorTargetZ = (-noseBridge.z * 8.1 - 2.1);
+        const positionSmoothFactor = 0.58;
+        const rotationSmoothFactor = 0.62;
+        const blendedFaceX = (noseBridge.x * 0.62) + (eyeCenterX * 0.28) + (templeMidX * 0.1);
+        const yawAmountTemple = rightTemple.z - leftTemple.z;
+        const yawAmountEye = rightEye.z - leftEye.z;
+        const yawAmount = (yawAmountTemple * 0.74) + (yawAmountEye * 0.26);
+        const anchorTargetZ = THREE.MathUtils.clamp((-2.15 - (0.115 - eyeDistance) * 8.2), -3.2, -1.45);
+        const depthFromCamera = camera.position.z - anchorTargetZ;
+        const halfHeightAtDepth = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * depthFromCamera;
+        const halfWidthAtDepth = halfHeightAtDepth * camera.aspect;
+        const rawYaw = THREE.MathUtils.clamp(yawAmount * 22, -1.25, 1.25);
+        const yawDeadzone = 0.04;
+        const yawAfterDeadzone = Math.abs(rawYaw) < yawDeadzone
+          ? 0
+          : Math.sign(rawYaw) * (Math.abs(rawYaw) - yawDeadzone);
+        yawFilteredRef.current += (yawAfterDeadzone - yawFilteredRef.current) * 0.55;
+        const targetYaw = yawFilteredRef.current;
+        const anchorTargetX = ((blendedFaceX - 0.5) * 2 * halfWidthAtDepth) + (targetYaw * 0.12);
+        const anchorTargetY = ((0.5 - noseBridge.y) * 2 * halfHeightAtDepth) - 0.34;
 
         if (faceAnchorRef.current) {
-          faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * smoothFactor;
-          faceAnchorRef.current.position.y += (anchorTargetY - faceAnchorRef.current.position.y) * smoothFactor;
-          faceAnchorRef.current.position.z += (anchorTargetZ - faceAnchorRef.current.position.z) * smoothFactor;
+          faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * positionSmoothFactor;
+          faceAnchorRef.current.position.y += (anchorTargetY - faceAnchorRef.current.position.y) * positionSmoothFactor;
+          faceAnchorRef.current.position.z += (anchorTargetZ - faceAnchorRef.current.position.z) * positionSmoothFactor;
         }
 
         const templeDx = rightTemple.x - leftTemple.x;
         const templeDy = rightTemple.y - leftTemple.y;
         const templeDz = rightTemple.z - leftTemple.z;
-        const faceWidth = Math.sqrt((templeDx ** 2) + (templeDy ** 2) + (templeDz ** 2));
+        const templeDistance = Math.sqrt((templeDx ** 2) + (templeDy ** 2) + (templeDz ** 2));
         const earDx = rightEar.x - leftEar.x;
         const earDy = rightEar.y - leftEar.y;
         const earDz = rightEar.z - leftEar.z;
         const earDistance = Math.sqrt((earDx ** 2) + (earDy ** 2) + (earDz ** 2));
-        const targetScale = Math.max(eyeDistance * 140, faceWidth * 82, earDistance * 82, 10.5);
+        const targetScale = Math.max(eyeDistance * 91.2, templeDistance * 51.2, earDistance * 49.6, 7.84);
         const currentScale = modelRef.current.scale.x || targetScale;
-        const limitedTargetScale = THREE.MathUtils.clamp(targetScale, currentScale * 0.93, currentScale * 1.07);
-        modelRef.current.scale.x += (limitedTargetScale - modelRef.current.scale.x) * smoothFactor;
-        modelRef.current.scale.y += (limitedTargetScale - modelRef.current.scale.y) * smoothFactor;
-        modelRef.current.scale.z += (limitedTargetScale - modelRef.current.scale.z) * smoothFactor;
+        const limitedTargetScale = THREE.MathUtils.clamp(targetScale, currentScale * 0.96, currentScale * 1.04);
+        modelRef.current.scale.x += (limitedTargetScale - modelRef.current.scale.x) * positionSmoothFactor;
+        modelRef.current.scale.y += (limitedTargetScale - modelRef.current.scale.y) * positionSmoothFactor;
+        modelRef.current.scale.z += (limitedTargetScale - modelRef.current.scale.z) * positionSmoothFactor;
 
-        const targetRoll = -Math.atan2(dy, dx);
-        const targetYaw = yawAmount * 1.15;
-        const targetPitch = -(chin.y - forehead.y - 0.33) * 1.6;
+        const targetRoll = THREE.MathUtils.clamp(-Math.atan2(dy, dx) * 1.05, -1.25, 1.25);
+        const targetPitchFromNose = ((noseBridge.y - eyeCenterY) - 0.038) * -10.5;
+        const targetPitchFromFaceHeight = (chin.y - forehead.y - 0.34) * 1.8;
+        const targetPitch = THREE.MathUtils.clamp((targetPitchFromNose * 0.78) + (targetPitchFromFaceHeight * 0.22), -1.05, 1.05);
 
         const rotationTarget = faceAnchorRef.current || modelRef.current;
-        rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * smoothFactor;
-        rotationTarget.rotation.y += (targetYaw - rotationTarget.rotation.y) * smoothFactor;
-        rotationTarget.rotation.x += (targetPitch - rotationTarget.rotation.x) * smoothFactor;
+        rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * rotationSmoothFactor;
+        rotationTarget.rotation.y += (targetYaw - rotationTarget.rotation.y) * rotationSmoothFactor;
+        rotationTarget.rotation.x += (targetPitch - rotationTarget.rotation.x) * rotationSmoothFactor;
 
-        // Keep occluder matched to face width/depth so temples get hidden correctly on yaw.
-        faceOccluder.scale.x += ((limitedTargetScale * 0.095) - faceOccluder.scale.x) * smoothFactor;
-        faceOccluder.scale.y += ((limitedTargetScale * 0.11) - faceOccluder.scale.y) * smoothFactor;
-        faceOccluder.scale.z += ((limitedTargetScale * 0.105) - faceOccluder.scale.z) * smoothFactor;
+        // Keep pitch in a sane range to avoid extreme flips on noisy frames.
+        rotationTarget.rotation.x = THREE.MathUtils.clamp(rotationTarget.rotation.x, -0.95, 0.95);
+
+        const yawNormalized = THREE.MathUtils.clamp(targetYaw / 1.25, -1, 1);
+        const occluders = templeOccludersRef.current;
+        if (occluders) {
+          // In mirrored selfie mode, geometric z-comparison can be inverted visually.
+          // Use filtered yaw sign for stable far-side detection in head turns.
+          const leftIsFar = yawNormalized < 0;
+          const turnAmount = Math.abs(yawNormalized);
+          const farScale = 0.8 + turnAmount * 3.2;
+          const nearScale = turnAmount > 0.12 ? 0.02 : 0.12;
+          const farXOffset = 1.08;
+          const nearXOffset = 0.66;
+
+          const leftTargetScale = leftIsFar ? farScale : nearScale;
+          const rightTargetScale = leftIsFar ? nearScale : farScale;
+          const leftTargetX = leftIsFar ? -farXOffset : -nearXOffset;
+          const rightTargetX = leftIsFar ? nearXOffset : farXOffset;
+
+          occluders.left.position.x += (leftTargetX - occluders.left.position.x) * positionSmoothFactor;
+          occluders.right.position.x += (rightTargetX - occluders.right.position.x) * positionSmoothFactor;
+          occluders.left.scale.x += ((leftTargetScale * 0.85) - occluders.left.scale.x) * positionSmoothFactor;
+          occluders.right.scale.x += ((rightTargetScale * 0.85) - occluders.right.scale.x) * positionSmoothFactor;
+          occluders.left.scale.y += ((leftTargetScale * 0.9) - occluders.left.scale.y) * positionSmoothFactor;
+          occluders.right.scale.y += ((rightTargetScale * 0.9) - occluders.right.scale.y) * positionSmoothFactor;
+          occluders.left.scale.z += ((leftTargetScale) - occluders.left.scale.z) * positionSmoothFactor;
+          occluders.right.scale.z += ((rightTargetScale) - occluders.right.scale.z) * positionSmoothFactor;
+        }
 
         });
 
