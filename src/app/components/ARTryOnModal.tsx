@@ -472,12 +472,12 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
-        const smoothFactor = 0.32;
-        const blendedFaceX = (noseBridge.x * 0.6) + (eyeCenterX * 0.4);
+        const smoothFactor = 0.42;
+        const blendedFaceX = (noseBridge.x * 0.82) + (eyeCenterX * 0.18);
         const yawAmount = rightEye.z - leftEye.z;
-        const anchorTargetX = ((blendedFaceX - 0.5) * 4.15) + (yawAmount * 0.65);
-        const anchorTargetY = (-((eyeCenterY * 0.7 + noseBridge.y * 0.3) - 0.5) * 3.05 - 0.24);
-        const anchorTargetZ = THREE.MathUtils.clamp((-eyeCenterZ * 8.6 - 2.45), -3.25, -1.55);
+        const anchorTargetX = ((blendedFaceX - 0.5) * 4.4);
+        const anchorTargetY = (-(noseBridge.y - 0.5) * 3.2 - 0.24);
+        const anchorTargetZ = THREE.MathUtils.clamp((-2.15 - (0.115 - eyeDistance) * 8.2), -3.2, -1.45);
 
         if (faceAnchorRef.current) {
           faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * smoothFactor;
@@ -495,7 +495,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const earDistance = Math.sqrt((earDx ** 2) + (earDy ** 2) + (earDz ** 2));
         const targetScale = Math.max(eyeDistance * 122, templeDistance * 69, earDistance * 66, 10.6);
         const currentScale = modelRef.current.scale.x || targetScale;
-        const limitedTargetScale = THREE.MathUtils.clamp(targetScale, currentScale * 0.97, currentScale * 1.03);
+        const limitedTargetScale = THREE.MathUtils.clamp(targetScale, currentScale * 0.96, currentScale * 1.04);
         modelRef.current.scale.x += (limitedTargetScale - modelRef.current.scale.x) * smoothFactor;
         modelRef.current.scale.y += (limitedTargetScale - modelRef.current.scale.y) * smoothFactor;
         modelRef.current.scale.z += (limitedTargetScale - modelRef.current.scale.z) * smoothFactor;
@@ -511,11 +511,6 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
         // Keep pitch in a sane range to avoid extreme flips on noisy frames.
         rotationTarget.rotation.x = THREE.MathUtils.clamp(rotationTarget.rotation.x, -0.95, 0.95);
-
-        const localModelTargetZ = 0.06 - Math.min(Math.abs(targetYaw) * 0.05, 0.07);
-        const localModelTargetY = -0.02 + Math.min(Math.abs(targetPitch) * 0.015, 0.03);
-        modelRef.current.position.z += (localModelTargetZ - modelRef.current.position.z) * smoothFactor;
-        modelRef.current.position.y += (localModelTargetY - modelRef.current.position.y) * smoothFactor;
 
         });
 
