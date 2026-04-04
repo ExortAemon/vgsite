@@ -467,9 +467,8 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
         const smoothFactor = 0.32;
         const blendedFaceX = (noseBridge.x * 0.8) + (centerX * 0.2);
-        const mirroredNoseX = 1 - blendedFaceX;
         const yawAmount = rightTemple.z - leftTemple.z;
-        const anchorTargetX = ((mirroredNoseX - 0.5) * 4.55);
+        const anchorTargetX = ((blendedFaceX - 0.5) * 4.55);
         const anchorTargetY = (-(noseBridge.y - 0.5) * 3.35 - 0.36);
         const anchorTargetZ = (-noseBridge.z * 8.1 - 2.1);
 
