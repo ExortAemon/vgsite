@@ -378,23 +378,26 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         }
 
         glasses.scale.setScalar(9.25);
-        glasses.position.set(0, -0.08, 0.12);
+        glasses.position.set(0, -0.03, 0.14);
         glasses.rotation.x = -0.08;
 
         const faceAnchor = new THREE.Group();
         faceAnchor.position.set(0, 0, -2.4);
         faceAnchor.add(glasses);
 
-        // Occluder: hides parts of glasses (especially temples) that should be behind the head.
+        // Occluders: hide only the side arms of the glasses behind the head without masking lenses.
         const occluderMaterial = new THREE.MeshBasicMaterial({
           colorWrite: false,
           depthWrite: true,
           depthTest: true,
           side: THREE.DoubleSide,
         });
-        const faceOccluder = new THREE.Mesh(new THREE.SphereGeometry(0.6, 32, 24), occluderMaterial);
-        faceOccluder.position.set(0, 0.02, -0.04);
-        faceAnchor.add(faceOccluder);
+        const leftTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.28, 0.52), occluderMaterial);
+        const rightTempleOccluder = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.28, 0.52), occluderMaterial);
+        leftTempleOccluder.position.set(-0.72, -0.02, -0.08);
+        rightTempleOccluder.position.set(0.72, -0.02, -0.08);
+        glasses.add(leftTempleOccluder);
+        glasses.add(rightTempleOccluder);
 
         scene.add(faceAnchor);
 
@@ -447,30 +450,32 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           }
 
         const landmarks = results.multiFaceLandmarks[0];
-        const leftEye = landmarks[468] || landmarks[33];
-        const rightEye = landmarks[473] || landmarks[263];
+        const leftEye = landmarks[33];
+        const rightEye = landmarks[263];
+        const leftInnerEye = landmarks[133] || leftEye;
+        const rightInnerEye = landmarks[362] || rightEye;
         const leftTemple = landmarks[234];
         const rightTemple = landmarks[454];
-        const forehead = landmarks[10];
-        const chin = landmarks[152];
         const nose = landmarks[1];
         const noseBridge = landmarks[6] || nose;
 
         const leftEar = landmarks[127] || leftTemple;
         const rightEar = landmarks[356] || rightTemple;
 
-        const centerX = (leftEye.x + rightEye.x) / 2;
+        const eyeCenterX = (leftInnerEye.x + rightInnerEye.x) / 2;
+        const eyeCenterY = (leftInnerEye.y + rightInnerEye.y) / 2;
+        const eyeCenterZ = (leftInnerEye.z + rightInnerEye.z) / 2;
 
         const dx = rightEye.x - leftEye.x;
         const dy = rightEye.y - leftEye.y;
         const eyeDistance = Math.sqrt(dx * dx + dy * dy);
 
         const smoothFactor = 0.32;
-        const blendedFaceX = (noseBridge.x * 0.8) + (centerX * 0.2);
-        const yawAmount = rightTemple.z - leftTemple.z;
+        const blendedFaceX = (noseBridge.x * 0.55) + (eyeCenterX * 0.45);
+        const yawAmount = leftEye.z - rightEye.z;
         const anchorTargetX = ((blendedFaceX - 0.5) * 4.55);
-        const anchorTargetY = (-(noseBridge.y - 0.5) * 3.35 - 0.36);
-        const anchorTargetZ = (-noseBridge.z * 8.1 - 2.1);
+        const anchorTargetY = (-((eyeCenterY * 0.65 + noseBridge.y * 0.35) - 0.5) * 3.25 - 0.28);
+        const anchorTargetZ = THREE.MathUtils.clamp((-eyeCenterZ * 9.4 - 2.55), -3.4, -1.45);
 
         if (faceAnchorRef.current) {
           faceAnchorRef.current.position.x += (anchorTargetX - faceAnchorRef.current.position.x) * smoothFactor;
@@ -481,31 +486,29 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const templeDx = rightTemple.x - leftTemple.x;
         const templeDy = rightTemple.y - leftTemple.y;
         const templeDz = rightTemple.z - leftTemple.z;
-        const faceWidth = Math.sqrt((templeDx ** 2) + (templeDy ** 2) + (templeDz ** 2));
+        const templeDistance = Math.sqrt((templeDx ** 2) + (templeDy ** 2) + (templeDz ** 2));
         const earDx = rightEar.x - leftEar.x;
         const earDy = rightEar.y - leftEar.y;
         const earDz = rightEar.z - leftEar.z;
         const earDistance = Math.sqrt((earDx ** 2) + (earDy ** 2) + (earDz ** 2));
-        const targetScale = Math.max(eyeDistance * 140, faceWidth * 82, earDistance * 82, 10.5);
+        const targetScale = Math.max(eyeDistance * 132, templeDistance * 74, earDistance * 70, 10.8);
         const currentScale = modelRef.current.scale.x || targetScale;
-        const limitedTargetScale = THREE.MathUtils.clamp(targetScale, currentScale * 0.93, currentScale * 1.07);
+        const limitedTargetScale = THREE.MathUtils.clamp(targetScale, currentScale * 0.95, currentScale * 1.05);
         modelRef.current.scale.x += (limitedTargetScale - modelRef.current.scale.x) * smoothFactor;
         modelRef.current.scale.y += (limitedTargetScale - modelRef.current.scale.y) * smoothFactor;
         modelRef.current.scale.z += (limitedTargetScale - modelRef.current.scale.z) * smoothFactor;
 
         const targetRoll = -Math.atan2(dy, dx);
-        const targetYaw = yawAmount * 1.15;
-        const targetPitch = -(chin.y - forehead.y - 0.33) * 1.6;
+        const targetYaw = yawAmount * 14.5;
+        const targetPitch = -(((noseBridge.y - eyeCenterY) - 0.04) * 10.5);
 
         const rotationTarget = faceAnchorRef.current || modelRef.current;
         rotationTarget.rotation.z += (targetRoll - rotationTarget.rotation.z) * smoothFactor;
         rotationTarget.rotation.y += (targetYaw - rotationTarget.rotation.y) * smoothFactor;
         rotationTarget.rotation.x += (targetPitch - rotationTarget.rotation.x) * smoothFactor;
 
-        // Keep occluder matched to face width/depth so temples get hidden correctly on yaw.
-        faceOccluder.scale.x += ((limitedTargetScale * 0.07) - faceOccluder.scale.x) * smoothFactor;
-        faceOccluder.scale.y += ((limitedTargetScale * 0.085) - faceOccluder.scale.y) * smoothFactor;
-        faceOccluder.scale.z += ((limitedTargetScale * 0.08) - faceOccluder.scale.z) * smoothFactor;
+        // Keep pitch in a sane range to avoid extreme flips on noisy frames.
+        rotationTarget.rotation.x = THREE.MathUtils.clamp(rotationTarget.rotation.x, -0.95, 0.95);
 
         });
 
