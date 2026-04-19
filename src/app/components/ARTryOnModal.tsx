@@ -550,7 +550,11 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const earDy = rightEar.y - leftEar.y;
         const earDz = rightEar.z - leftEar.z;
         const earDistance = Math.sqrt((earDx ** 2) + (earDy ** 2) + (earDz ** 2));
-        const targetScale = Math.max(eyeDistance * 91.2, templeDistance * 51.2, earDistance * 49.6, 7.84);
+        const baseScale = Math.max(eyeDistance * 91.2, templeDistance * 51.2, earDistance * 49.6, 7.84);
+        const portraitFactor = camera.aspect < 0.85
+          ? THREE.MathUtils.clamp(0.72 + (camera.aspect * 0.33), 0.72, 1)
+          : 1;
+        const targetScale = baseScale * portraitFactor;
         const currentScale = modelRef.current.scale.x || targetScale;
         const limitedTargetScale = THREE.MathUtils.clamp(targetScale, currentScale * 0.96, currentScale * 1.04);
         modelRef.current.scale.x += (limitedTargetScale - modelRef.current.scale.x) * positionSmoothFactor;
@@ -602,14 +606,17 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
 
         });
 
+        const streamWidth = video.videoWidth || 1280;
+        const streamHeight = video.videoHeight || 720;
+
         const faceCamera = new window.Camera(video, {
           onFrame: async () => {
             if (faceMeshRef.current) {
               await faceMeshRef.current.send({ image: video });
             }
           },
-          width: 1280,
-          height: 720,
+          width: streamWidth,
+          height: streamHeight,
         });
 
         cameraLoopRef.current = faceCamera;
