@@ -406,7 +406,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
           throw new Error(`MODEL_LOAD_FAILED:${modelLoadErrorMessage}`);
         }
 
-        glasses.scale.setScalar(6.68);
+        glasses.scale.setScalar(8.684);
         glasses.position.set(0, -0.1, 0.04);
         glasses.rotation.x = -0.08;
 
@@ -550,7 +550,7 @@ export function ARTryOnModal({ isOpen, onClose, productName, modelName, modelUrl
         const earDy = rightEar.y - leftEar.y;
         const earDz = rightEar.z - leftEar.z;
         const earDistance = Math.sqrt((earDx ** 2) + (earDy ** 2) + (earDz ** 2));
-        const baseScale = Math.max(eyeDistance * 91.2, templeDistance * 51.2, earDistance * 49.6, 7.84);
+        const baseScale = Math.max(eyeDistance * 118.56, templeDistance * 66.56, earDistance * 64.48, 10.192);
         const portraitFactor = camera.aspect < 0.85
           ? THREE.MathUtils.clamp(0.72 + (camera.aspect * 0.33), 0.72, 1)
           : 1;
