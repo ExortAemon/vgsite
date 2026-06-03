@@ -1,16 +1,13 @@
 -- SQL dump for the VG eyewear shop.
--- Import this file in phpMyAdmin to create a MySQL/MariaDB database
--- with product catalog, users, carts, orders, contact messages, and seed data.
+-- Import this file in phpMyAdmin after opening/selecting your existing database.
+-- Hosting accounts often do not allow CREATE DATABASE or USE database_name;
+-- those commands are intentionally omitted to avoid phpMyAdmin error #1044.
+-- The dump creates tables for the product catalog, users, carts, orders,
+-- contact messages, and seed data in the currently selected database.
 
 SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
 SET time_zone = '+00:00';
 SET NAMES utf8mb4;
-
-CREATE DATABASE IF NOT EXISTS `vgsite`
-  DEFAULT CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE `vgsite`;
 
 START TRANSACTION;
 
