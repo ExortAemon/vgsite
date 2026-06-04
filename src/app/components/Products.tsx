@@ -58,14 +58,15 @@ const fallbackProducts: Product[] = [
 export function Products() {
   const [products, setProducts] = useState<Product[]>(fallbackProducts);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [statusMessage, setStatusMessage] = useState("");
   const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     apiRequest<{ products: Product[] }>("/products.php")
       .then((data) => setProducts(data.products))
-      .catch(() => setStatusMessage("Показаны демо-товары. Для живого каталога проверьте подключение к серверной папке /api."));
+      .catch(() => {
+        // Если backend ещё не загружен на хостинг, оставляем товары из локального списка без сообщения на экране.
+      });
   }, []);
 
   const handleAddToCart = async (product: Product) => {
@@ -106,7 +107,6 @@ export function Products() {
           <p className="text-xl text-slate-400 max-w-2xl mx-auto">
             Смотреть товары могут все посетители, а оформить заказ можно только после входа в аккаунт покупателя.
           </p>
-          {statusMessage && <p className="mt-4 text-sm text-amber-300">{statusMessage}</p>}
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

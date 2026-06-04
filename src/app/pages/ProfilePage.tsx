@@ -302,12 +302,15 @@ function AdminProfile() {
 export function ProfilePage() {
   const { user, isLoading } = useAuth();
 
-  if (isLoading) {
-    return <div className="min-h-screen bg-slate-900 py-12 text-center text-slate-300">Загрузка профиля...</div>;
-  }
-
   if (!user) {
-    return <AuthForms />;
+    return (
+      <AuthForms
+        description={isLoading
+          ? "Проверяем текущий вход. Формы уже доступны: войдите в аккаунт или зарегистрируйтесь, чтобы получить личный кабинет и оформлять заказы."
+          : "Просматривать товары можно без входа, но оформление заказа и личный кабинет доступны только зарегистрированным покупателям."
+        }
+      />
+    );
   }
 
   return (
