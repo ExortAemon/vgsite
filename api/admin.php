@@ -40,6 +40,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         log_action($pdo, (int) $user['id'], 'user_status_updated', ['user_id' => $userId, 'status' => $status]);
         json_response(['success' => true]);
     }
+
+    if ($action === 'set_user_role') {
+        $userId = (int) ($input['user_id'] ?? 0);
+        $role = (string) ($input['role'] ?? '');
+        if (!in_array($role, ['customer', 'seller', 'admin'], true)) {
+            json_response(['error' => 'Недопустимая роль пользователя.'], 400);
+        }
+        if ($userId === (int) $user['id']) {
+            json_response(['error' => 'Нельзя менять роль самому себе.'], 400);
+        }
+        $stmt = $pdo->prepare('UPDATE users SET role = :role WHERE id = :id');
+        $stmt->execute([':role' => $role, ':id' => $userId]);
+        log_action($pdo, (int) $user['id'], 'user_role_updated', ['user_id' => $userId, 'role' => $role]);
+        json_response(['success' => true]);
+    }
 }
 
 json_response(['error' => 'Not found.'], 404);

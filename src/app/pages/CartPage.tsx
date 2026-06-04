@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiRequest, CartPayload, formatPrice } from "@/app/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
+import { AuthForms } from "@/app/components/AuthForms";
 
 export function CartPage() {
   const [cart, setCart] = useState<CartPayload>({ items: [], total_kzt: 0 });
@@ -71,16 +72,12 @@ export function CartPage() {
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-900 py-12">
-        <div className="container mx-auto px-4 max-w-3xl">
-          <Card className="bg-slate-800 border-slate-700">
-            <CardContent className="p-12 text-center">
-              <h1 className="text-3xl text-white mb-4">Корзина доступна после входа</h1>
-              <p className="text-slate-400 mb-6">Товары можно смотреть без аккаунта, но заказать можно только после регистрации или входа.</p>
-              <Link to="/profile">
-                <Button className="bg-emerald-600 hover:bg-emerald-700">Войти или зарегистрироваться</Button>
-              </Link>
-            </CardContent>
-          </Card>
+        <div className="container mx-auto px-4 max-w-5xl">
+          <AuthForms
+            compact
+            title="Войдите или зарегистрируйтесь для заказа"
+            description="Корзина показывает форму входа и регистрации сразу здесь: без аккаунта заказать очки нельзя, потому что заказ должен быть привязан к покупателю, телефону, email и истории покупок."
+          />
         </div>
       </div>
     );

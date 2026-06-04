@@ -65,13 +65,13 @@ export function Products() {
   useEffect(() => {
     apiRequest<{ products: Product[] }>("/products.php")
       .then((data) => setProducts(data.products))
-      .catch(() => setStatusMessage("Показаны демо-товары. Для живого каталога настройте API."));
+      .catch(() => setStatusMessage("Показаны демо-товары. Для живого каталога проверьте подключение к серверной папке /api."));
   }, []);
 
   const handleAddToCart = async (product: Product) => {
     if (!user) {
       alert("Чтобы заказать товар, сначала зарегистрируйтесь или войдите в аккаунт.");
-      navigate("/profile");
+      navigate("/cart");
       return;
     }
 

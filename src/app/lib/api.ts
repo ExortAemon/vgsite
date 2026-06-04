@@ -67,10 +67,10 @@ export interface AdminAction {
   role: UserRole | null;
 }
 
-const API_BASE = "/api";
+const BACKEND_BASE_URL = "/api";
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
