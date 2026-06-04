@@ -6,6 +6,7 @@ import { Label } from "@/app/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Mail, Phone, MapPin } from "lucide-react";
 import { motion } from "motion/react";
+import { apiRequest } from "@/app/lib/api";
 
 export function ContactForm() {
   const [formData, setFormData] = useState({
@@ -15,12 +16,19 @@ export function ContactForm() {
     message: ""
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted:", formData);
-    // Здесь можно добавить логику отправки формы
-    alert("Спасибо за ваше сообщение! Мы свяжемся с вами в ближайшее время.");
-    setFormData({ name: "", email: "", phone: "", message: "" });
+
+    try {
+      await apiRequest("/contact.php", {
+        method: "POST",
+        body: JSON.stringify(formData)
+      });
+      alert("Спасибо за ваше сообщение! Мы свяжемся с вами в ближайшее время.");
+      setFormData({ name: "", email: "", phone: "", message: "" });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Не удалось отправить сообщение.");
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
