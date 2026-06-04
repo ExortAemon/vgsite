@@ -10,11 +10,7 @@ import { ContactsPage } from "@/app/pages/ContactsPage";
 import { AuthProvider, useAuth } from "@/app/context/AuthContext";
 
 function RoleAwarePage({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <div className="min-h-screen bg-slate-900 py-12 text-center text-slate-300">Загрузка...</div>;
-  }
+  const { user } = useAuth();
 
   if (user?.role === "seller" || user?.role === "admin") {
     return <ProfilePage />;

@@ -68,25 +68,39 @@ export interface AdminAction {
 }
 
 const BACKEND_BASE_URL = "/api";
+const DEFAULT_REQUEST_TIMEOUT_MS = 8000;
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    },
-    ...options
-  });
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
 
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : {};
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
+      ...options,
+      credentials: "include",
+      signal: options.signal || controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      }
+    });
 
-  if (!response.ok) {
-    throw new Error(data.error || "Ошибка запроса к серверу");
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
+
+    if (!response.ok) {
+      throw new Error(data.error || "Ошибка запроса к серверу");
+    }
+
+    return data as T;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Серверная папка /api не ответила вовремя. Проверьте backend на хостинге.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
-
-  return data as T;
 }
 
 export function formatPrice(price: number) {
