@@ -17,6 +17,7 @@ DROP TABLE IF EXISTS `orders`;
 DROP TABLE IF EXISTS `cart_items`;
 DROP TABLE IF EXISTS `carts`;
 DROP TABLE IF EXISTS `contact_messages`;
+DROP TABLE IF EXISTS `user_actions`;
 DROP TABLE IF EXISTS `product_images`;
 DROP TABLE IF EXISTS `products`;
 DROP TABLE IF EXISTS `categories`;
@@ -24,15 +25,19 @@ DROP TABLE IF EXISTS `users`;
 
 CREATE TABLE `users` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `username` VARCHAR(80) NOT NULL,
   `name` VARCHAR(120) NOT NULL,
   `email` VARCHAR(191) NOT NULL,
   `phone` VARCHAR(40) DEFAULT NULL,
-  `password_hash` VARCHAR(255) DEFAULT NULL,
-  `role` ENUM('customer', 'admin') NOT NULL DEFAULT 'customer',
+  `password_hash` VARCHAR(255) NOT NULL,
+  `role` ENUM('customer', 'seller', 'admin') NOT NULL DEFAULT 'customer',
+  `status` ENUM('active', 'blocked') NOT NULL DEFAULT 'active',
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `users_email_unique` (`email`)
+  UNIQUE KEY `users_username_unique` (`username`),
+  UNIQUE KEY `users_email_unique` (`email`),
+  KEY `users_role_status_index` (`role`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `categories` (
@@ -102,6 +107,22 @@ CREATE TABLE `contact_messages` (
   PRIMARY KEY (`id`),
   KEY `contact_messages_status_index` (`status`),
   KEY `contact_messages_email_index` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `user_actions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED DEFAULT NULL,
+  `action` VARCHAR(120) NOT NULL,
+  `details` TEXT DEFAULT NULL,
+  `ip_address` VARCHAR(45) DEFAULT NULL,
+  `user_agent` VARCHAR(255) DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `user_actions_user_id_index` (`user_id`),
+  KEY `user_actions_action_index` (`action`),
+  CONSTRAINT `user_actions_user_id_fk`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+    ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `carts` (
@@ -182,9 +203,10 @@ CREATE TABLE `order_items` (
   CONSTRAINT `order_items_quantity_positive_chk` CHECK (`quantity` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `users` (`id`, `name`, `email`, `phone`, `password_hash`, `role`) VALUES
-  (1, 'Иван Иванов', 'ivan@example.kz', '+7 (777) 123-45-67', NULL, 'customer'),
-  (2, 'Администратор VG', 'admin@eyewear.kz', '+7 (727) 123-45-67', NULL, 'admin');
+INSERT INTO `users` (`id`, `username`, `name`, `email`, `phone`, `password_hash`, `role`, `status`) VALUES
+  (1, 'ivan', 'Иван Иванов', 'ivan@example.kz', '+7 (777) 123-45-67', '$2y$12$q7sJisjcNAvxjZgkXuxA4eqH6ZYeNTdGRZtivZ.WKXzgRkQVHUICe', 'customer', 'active'),
+  (2, 'prodavec', 'Продавец', 'seller@eyewear.kz', '+7 (747) 555-35-35', '$2y$12$RI9nkl3nIF/fEhxZKsT8ROWcZJn.qK3EH/6ovzSMu2izSkFDjS0FO', 'seller', 'active'),
+  (3, 'admin', 'Администратор VG', 'admin@eyewear.kz', '+7 (727) 123-45-67', '$2y$12$iUh8oyTq5mq2Ij/FdGjcaehQCRRPTeIux1rdck8DUTCstLXpaKcF.', 'admin', 'active');
 
 INSERT INTO `categories` (`id`, `name`, `slug`, `description`, `sort_order`) VALUES
   (1, 'Авиаторы', 'aviators', 'Классические очки-авиаторы для ежедневного образа.', 10),
@@ -208,6 +230,11 @@ FROM `products`;
 
 INSERT INTO `contact_messages` (`name`, `email`, `phone`, `message`, `status`) VALUES
   ('Алия Садыкова', 'aliya@example.kz', '+7 (701) 111-22-33', 'Здравствуйте! Есть ли самовывоз из Алматы?', 'new');
+
+INSERT INTO `user_actions` (`user_id`, `action`, `details`) VALUES
+  (1, 'seed_login_example', '{"note":"Демонстрационное действие пользователя"}'),
+  (2, 'seed_seller_example', '{"note":"Демонстрационное действие продавца"}'),
+  (3, 'seed_admin_example', '{"note":"Демонстрационное действие администратора"}');
 
 INSERT INTO `carts` (`id`, `user_id`, `session_id`, `status`) VALUES
   (1, 1, NULL, 'active');

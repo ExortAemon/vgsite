@@ -7,13 +7,15 @@ import { CartPage } from "@/app/pages/CartPage";
 import { ProfilePage } from "@/app/pages/ProfilePage";
 import { AboutPage } from "@/app/pages/AboutPage";
 import { ContactsPage } from "@/app/pages/ContactsPage";
+import { AuthProvider } from "@/app/context/AuthContext";
 
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1">
+      <AuthProvider>
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className="flex-1">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/catalog" element={<CatalogPage />} />
@@ -25,9 +27,10 @@ export default function App() {
               element={<ContactsPage />}
             />
           </Routes>
-        </main>
-        <Footer />
-      </div>
+          </main>
+          <Footer />
+        </div>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

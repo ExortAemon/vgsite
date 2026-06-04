@@ -2,11 +2,13 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ShoppingCart, User, Menu } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { useState } from "react";
+import { useAuth } from "@/app/context/AuthContext";
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const handleNavigation = (path: string, sectionId?: string) => {
     if (location.pathname !== path) {
@@ -59,11 +61,13 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-4">
-            <Link to="/cart">
-              <Button variant="ghost" size="icon" className="text-slate-300 hover:text-emerald-400">
-                <ShoppingCart className="h-5 w-5" />
-              </Button>
-            </Link>
+            {(!user || user.role === "customer") && (
+              <Link to="/cart">
+                <Button variant="ghost" size="icon" className="text-slate-300 hover:text-emerald-400">
+                  <ShoppingCart className="h-5 w-5" />
+                </Button>
+              </Link>
+            )}
             <Link to="/profile">
               <Button variant="ghost" size="icon" className="text-slate-300 hover:text-emerald-400">
                 <User className="h-5 w-5" />
